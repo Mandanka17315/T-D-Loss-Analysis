@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>T&amp;D Loss Analysis — Baroda O&amp;M Circle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --rail:#14212b; --rail-2:#1d3040; --page:#f4f7f8; --surface:#ffffff;
+  --ink:#16232d; --ink-2:#54666f; --line:#d6dde3; --line-2:#e9eef1;
+  --accent:#0b6e7f; --accent-soft:#e2f0f2;
+  --alert:#b4400f; --alert-soft:#fdece3;
+  --good:#1a7f4b; --good-soft:#e5f4ec;
+  --warn-row:#fff6e8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--page); color:var(--ink); font-size:14px; line-height:1.45;
+  font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0; font-weight:600; letter-spacing:-0.01em}
+button{font:inherit; cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- shell ---------- */
+#shell{display:flex; min-height:100vh}
+#rail{
+  width:236px; flex:0 0 236px; background:var(--rail); color:#c9d6dd;
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+}
+#rail .brand{padding:20px 18px 16px; border-bottom:1px solid rgba(255,255,255,.09)}
+#rail .brand .t{color:#fff; font-size:15px; font-weight:600; line-height:1.25}
+#rail .brand .s{font-size:12px; color:#7f97a4; margin-top:3px}
+#rail nav{padding:8px 0; overflow-y:auto; flex:1}
+#rail nav button{
+  display:block; width:100%; text-align:left; background:none; border:0;
+  color:#b4c5ce; padding:9px 18px; font-size:13.5px; border-left:3px solid transparent;
+}
+#rail nav button:hover{background:var(--rail-2); color:#fff}
+#rail nav button.on{background:var(--rail-2); color:#fff; border-left-color:#3ec7d8; font-weight:500}
+#rail nav .grp{padding:14px 18px 5px; font-size:11px; color:#6b8290; letter-spacing:.03em}
+#rail .foot{padding:12px 18px; font-size:11px; color:#6b8290; border-top:1px solid rgba(255,255,255,.09)}
+
+#main{flex:1; min-width:0; display:flex; flex-direction:column}
+
+/* ---------- topbar ---------- */
+#topbar{
+  background:var(--surface); border-bottom:1px solid var(--line); padding:12px 22px;
+  display:flex; gap:16px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:40;
+}
+#topbar .status{font-size:13px; color:var(--ink-2)}
+#topbar .status b{color:var(--ink); font-weight:600}
+.filebtn{
+  background:var(--accent); color:#fff; border:0; border-radius:5px; padding:8px 15px; font-weight:500;
+}
+.filebtn:hover{background:#095a68}
+.ghost{
+  background:var(--surface); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:7px 13px;
+}
+.ghost:hover{border-color:var(--accent); color:var(--accent)}
+.ghost:disabled{opacity:.45; cursor:not-allowed}
+select,input[type=text],input[type=search]{
+  font:inherit; padding:6px 9px; border:1px solid var(--line); border-radius:5px;
+  background:var(--surface); color:var(--ink); min-width:130px;
+}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+
+/* ---------- content ---------- */
+#content{padding:22px; flex:1}
+.panel{display:none}
+.panel.on{display:block}
+.phead{display:flex; align-items:flex-end; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:14px}
+.phead h2{font-size:19px}
+.phead p{margin:3px 0 0; font-size:13px; color:var(--ink-2); max-width:70ch}
+.tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+.filters{
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px;
+  background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:10px 12px;
+}
+.filters label{font-size:12.5px; color:var(--ink-2)}
+.count{font-size:12.5px; color:var(--ink-2); margin-left:auto}
+
+/* ---------- hero ---------- */
+.hero{
+  background:var(--rail); color:#fff; border-radius:8px; padding:22px 24px; margin-bottom:18px;
+  display:flex; gap:38px; align-items:flex-end; flex-wrap:wrap;
+}
+.hero .big{font-size:52px; font-weight:600; line-height:.95; letter-spacing:-0.03em}
+.hero .biglab{font-size:12.5px; color:#8fa8b5; margin-top:7px; max-width:20ch}
+.hero .m{border-left:1px solid rgba(255,255,255,.16); padding-left:26px}
+.hero .m .v{font-size:23px; font-weight:600}
+.hero .m .l{font-size:12px; color:#8fa8b5; margin-top:2px}
+.up{color:#ff9f6e} .down{color:#5fd39a}
+
+/* ---------- tables ---------- */
+.tblwrap{
+  background:var(--surface); border:1px solid var(--line); border-radius:6px;
+  overflow:auto; max-height:calc(100vh - 250px); margin-bottom:18px;
+}
+table{border-collapse:separate; border-spacing:0; width:100%; font-size:12.5px}
+thead th{
+  background:#eef3f5; color:var(--ink); font-weight:600; text-align:center;
+  padding:6px 8px; border-bottom:1px solid var(--line); border-right:1px solid var(--line-2);
+  position:sticky; top:0; z-index:2; white-space:nowrap;
+}
+thead tr:nth-child(2) th{top:29px; z-index:1; font-weight:500; background:#f4f7f8}
+thead tr:nth-child(3) th{top:58px; z-index:1; font-weight:500; background:#f4f7f8}
+body.exporting .panel{display:block !important}
+body.exporting .tblwrap{max-height:none; overflow:visible}
+tbody td{padding:5px 8px; border-bottom:1px solid var(--line-2); border-right:1px solid var(--line-2); white-space:nowrap}
+tbody tr:hover td{background:#f7fbfc}
+td.n,th.n{text-align:right; font-variant-numeric:tabular-nums}
+td.t{text-align:left}
+td.c{text-align:center}
+tbody tr.tot td{background:#eef3f5; font-weight:600}
+tbody tr.tot:hover td{background:#e7eef1}
+.blk1{border-left:2px solid #c3d2d9}
+.pos{color:var(--good)} .neg{color:var(--alert)}
+.hl{background:var(--warn-row) !important}
+.sec{font-size:14px; font-weight:600; margin:20px 0 8px; padding-left:9px; border-left:3px solid var(--accent)}
+.sec span{font-weight:400; color:var(--ink-2); font-size:12.5px; margin-left:7px}
+.fdr{color:var(--accent); cursor:pointer; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px}
+.fdr:hover{color:#083f49; background:var(--accent-soft)}
+.chips{white-space:normal; line-height:1.7; min-width:150px}
+.pill{
+  display:inline-block; font-size:11px; padding:1px 6px; border-radius:9px;
+  background:var(--accent-soft); color:#084f5c; margin-left:6px;
+}
+.empty{padding:26px; text-align:center; color:var(--ink-2); background:var(--surface);
+  border:1px dashed var(--line); border-radius:6px}
+.note{font-size:12px; color:var(--ink-2); margin:-6px 0 12px}
+
+/* ---------- landing ---------- */
+#landing{max-width:640px; margin:9vh auto; text-align:center}
+#landing h1{font-size:26px; margin-bottom:8px}
+#landing p{color:var(--ink-2); margin:0 0 22px}
+#drop{
+  border:2px dashed var(--line); border-radius:10px; padding:44px 24px; background:var(--surface);
+  transition:border-color .15s, background .15s;
+}
+#drop.hot{border-color:var(--accent); background:var(--accent-soft)}
+#drop .hint{font-size:13px; color:var(--ink-2); margin-top:12px}
+
+/* ---------- modal ---------- */
+#modal{
+  position:fixed; inset:0; background:rgba(16,32,42,.55); z-index:100;
+  display:none; align-items:flex-start; justify-content:center; padding:36px 18px; overflow:auto;
+}
+#modal.on{display:flex}
+#modalBox{
+  background:var(--page); border-radius:8px; width:min(1180px,100%); max-height:100%;
+  overflow:auto; box-shadow:0 18px 50px rgba(0,0,0,.3);
+}
+#modalHead{
+  position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--line);
+  padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:14px; z-index:5;
+}
+#modalBody{padding:18px}
+.x{background:none; border:0; font-size:22px; line-height:1; color:var(--ink-2); padding:2px 8px}
+.x:hover{color:var(--alert)}
+
+/* ---------- search results ---------- */
+.results{
+  background:var(--surface); border:1px solid var(--line); border-radius:6px;
+  max-height:260px; overflow:auto; margin-bottom:14px;
+}
+.results div{padding:6px 11px; cursor:pointer; border-bottom:1px solid var(--line-2); font-size:13px}
+.results div:hover{background:var(--accent-soft)}
+.results div b{font-weight:600}
+
+/* ---------- print ---------- */
+@media print{
+  #rail,#topbar,.tools,.filters,.filebtn,.ghost,#modal,.results{display:none !important}
+  body{background:#fff}
+  #content{padding:0}
+  .tblwrap{max-height:none; overflow:visible; border:0; page-break-inside:auto}
+  table{font-size:7pt}
+  thead th{position:static; background:#eef3f5 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .hl{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .panel{display:none}
+  .panel.on{display:block}
+  body.printall .panel{display:block !important; page-break-after:always}
+  body.printall .panel:last-child{page-break-after:auto}
+  .hero{background:#eef3f5 !important; color:#16232d !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .hero .biglab,.hero .m .l{color:#54666f !important}
+  .hero .m{border-left-color:#d6dde3 !important}
+}
+</style>
+</head>
+<body>
+
+<div id="shell">
+  <aside id="rail">
+    <div class="brand">
+      <div class="t">T&amp;D Loss Analysis</div>
+      <div class="s">Baroda O&amp;M Circle Office</div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="foot">Prepared for A H Mandanka, Junior Engineer</div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <button class="filebtn" id="pickBtn">Load workbook</button>
+      <input type="file" id="file" accept=".xlsm,.xlsx,.xls" style="display:none">
+      <div class="status" id="status">No workbook loaded</div>
+      <div style="margin-left:auto; display:flex; gap:9px; align-items:center">
+        <label style="font-size:12.5px; color:var(--ink-2)">T&amp;D month</label>
+        <select id="monthSel" disabled></select>
+      </div>
+    </div>
+
+    <div id="content">
+      <div id="landing">
+        <h1>Loss reduction analysis</h1>
+        <p>Load the circle T&amp;D workbook to break losses down by circle, division,
+           sub-division, category and feeder.</p>
+        <div id="drop">
+          <button class="filebtn" id="pickBtn2">Choose Excel file</button>
+          <div class="hint">or drop <b>TD_Loss_Analysis_BOMC.xlsm</b> here.<br>
+          Needs the sheets: Feeders, SDn Cat, SDn Wise, Div Cat, Circle. Nothing leaves this browser.</div>
+        </div>
+      </div>
+      <div id="panels"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal"><div id="modalBox">
+  <div id="modalHead"><h3 id="modalTitle"></h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="ghost" id="mXls">Excel</button>
+      <button class="ghost" id="mPdf">PDF</button>
+      <button class="x" id="mClose" aria-label="Close">&times;</button>
+    </div>
+  </div>
+  <div id="modalBody"></div>
+</div></div>
+
+<script>
+"use strict";
+/* ==================================================================
+   T&D Loss Analysis — Baroda O&M Circle
+   Single-file browser tool. Reads the circle workbook, renders every
+   worksheet as a tab, and exports each view to Excel / PDF.
+   ================================================================== */
+
+/* ---------- column maps (0-based, matching the workbook layout) ---------- */
+const F = { DIVC:0, DIV:1, SDCD:2, SDN:3, FDR:4, NAME:5, CAT:6, HIGH:7,
+            FY:8, CPY:12, CCY:16, PCT:20, MU:21, TGT:22, SHF:23, PM:24 };
+const monthPY = m => 25 + 8*m;      // Apr PY = Z(25), then every 8 columns
+const monthCY = m => 29 + 8*m;      // Apr CY = AD(29)
+
+const SC = { DIV:2, SDCD:3, SDN:4, CAT:5, FY:6,  CPY:10, CCY:14, PCT:18, MU:19, TGT:20, SHF:21, PM:22 };
+const SW = { DIV:1, SDCD:2, SDN:3,          FY:4,  CPY:8,  CCY:12, PCT:16, MU:17, TGT:18, SHF:19, PM:20 };
+const DC = { DIV:1, CAT:2,                  FY:3,  CPY:7,  CCY:11, PCT:15, MU:16, TGT:17, SHF:18, PM:19 };
+const CI = { CAT:1,                         FY:2,  CPY:6,  CCY:10, PCT:14, MU:15, TGT:16, SHF:17, PM:18 };
+
+const FY_MONTHS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
+const CATS      = ["EHT","HTEX","INDU","JGY","URBAN","GIDC","AG","AGSKY","SST"];
+const CRITERIA  = [ {key:"INDU", label:"IND", t:5}, {key:"GIDC", label:"GIDC", t:2},
+                    {key:"JGY", label:"JGY", t:25}, {key:"URBAN", label:"URBAN", t:10},
+                    {key:"AG",  label:"AG",  t:25} ];
+const SLABS = [
+  {label:"< 10%",          test:v => v < 10},
+  {label:"10% – 20%",      test:v => v >= 10 && v < 20},
+  {label:"20% – 30%",      test:v => v >= 20 && v < 30},
+  {label:"30% – 40%",      test:v => v >= 30 && v < 40},
+  {label:"40% – 50%",      test:v => v >= 40 && v < 50},
+  {label:"> 50%",          test:v => v >= 50}
+];
+
+/* ---------- state ---------- */
+const S = {
+  feeders:[], sdnCat:[], sdnWise:[], divCat:[], circle:[],
+  divisions:[], subdivs:{}, month:"Jun", monthIdx:2,
+  pyLabel:"2025-26", cyLabel:"2026-27",
+  fileName:"", rawLoss:false, active:"circle", rendered:{}
+};
+
+/* ---------- helpers ---------- */
+const $  = s => document.querySelector(s);
+const el = (t,c,txt) => { const e=document.createElement(t); if(c) e.className=c;
+                          if(txt!==undefined&&txt!==null) e.textContent=txt; return e; };
+const num = v => (typeof v === "number" && isFinite(v)) ? v
+               : (typeof v === "string" && v.trim()!=="" && isFinite(+v)) ? +v : null;
+const f3  = v => { const n=num(v); return n===null ? "" : n.toFixed(3); };
+const f2  = v => { const n=num(v); return n===null ? "" : n.toFixed(2); };
+const txt = v => (v===null||v===undefined) ? "" : String(v).trim();
+const normDiv = v => txt(v).replace(/\s*Div\.?\s*$/i,"").trim();
+
+/* ================================================================
+   1. WORKBOOK PARSING
+   ================================================================ */
+function findSheet(wb, wanted){
+  const keys = wb.SheetNames;
+  let k = keys.find(n => n.trim().toLowerCase() === wanted.toLowerCase());
+  if(k) return wb.Sheets[k];
+  // tolerate the workbook's "Cirlce" misspelling and similar
+  const squash = s => s.toLowerCase().replace(/[^a-z]/g,"").split("").sort().join("");
+  k = keys.find(n => squash(n) === squash(wanted));
+  return k ? wb.Sheets[k] : null;
+}
+function rowsOf(sheet, firstDataRow){
+  if(!sheet) return {aoa:[], data:[]};
+  const aoa = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null, blankrows:true});
+  return {aoa, data: aoa.slice(firstDataRow - 1)};
+}
+
+function parseWorkbook(buf, name){
+  const wb = XLSX.read(buf, {type:"array", cellDates:true});
+
+  const fSheet = findSheet(wb,"Feeders");
+  if(!fSheet) throw new Error("No sheet named \u201cFeeders\u201d was found in this workbook.");
+
+  const fr = rowsOf(fSheet, 5);
+  S.feeders = fr.data.filter(r => r && txt(r[F.NAME]) !== "" && txt(r[F.DIV]) !== "")
+                     .map(r => { r[F.DIV] = normDiv(r[F.DIV]); return r; });
+  if(!S.feeders.length) throw new Error("The Feeders sheet has no data rows from row 5 onward.");
+
+  // month token from Feeders!A1, financial-year labels from the header row
+  const a1 = txt(fr.aoa[0] && fr.aoa[0][0]);
+  const hit = FY_MONTHS.find(m => a1.toLowerCase().startsWith(m.toLowerCase()));
+  S.month = hit || "Mar";
+  S.monthIdx = FY_MONTHS.indexOf(S.month);
+
+  const h2 = fr.aoa[1] || [];
+  const grab = v => { const m = txt(v).match(/(\d{4}\s*-\s*\d{2})/); return m ? m[1].replace(/\s/g,"") : null; };
+  S.pyLabel = grab(h2[F.CPY]) || grab(h2[F.FY]) || "2025-26";
+  S.cyLabel = grab(h2[F.CCY]) || "2026-27";
+
+  const keep = (rows, labelCol) => rows.filter(r => r && txt(r[labelCol]) !== "");
+  S.sdnCat  = keep(rowsOf(findSheet(wb,"SDn Cat"), 4).data,  SC.SDN)
+                .map(r => { r[SC.DIV] = normDiv(r[SC.DIV]); return r; });
+  S.sdnWise = keep(rowsOf(findSheet(wb,"SDn Wise"), 4).data, SW.SDN)
+                .map(r => { r[SW.DIV] = normDiv(r[SW.DIV]); return r; });
+  S.divCat  = keep(rowsOf(findSheet(wb,"Div Cat"), 4).data,  DC.CAT)
+                .map(r => { r[DC.DIV] = normDiv(r[DC.DIV]); return r; });
+  S.circle  = keep(rowsOf(findSheet(wb,"Circle"), 4).data,   CI.CAT);
+
+  // division / sub-division lists, ordered as they appear in the workbook
+  S.divisions = []; S.subdivs = {};
+  const src = S.sdnWise.length ? S.sdnWise : S.feeders;
+  const dCol = S.sdnWise.length ? SW.DIV : F.DIV, sCol = S.sdnWise.length ? SW.SDN : F.SDN;
+  src.forEach(r => {
+    const d = txt(r[dCol]), s = txt(r[sCol]);
+    if(!d) return;
+    if(!S.subdivs[d]){ S.subdivs[d] = []; S.divisions.push(d); }
+    if(s && !S.subdivs[d].includes(s)) S.subdivs[d].push(s);
+  });
+  S.fileName = name;
+}
+
+/* ================================================================
+   2. TABLE BUILDING
+   ================================================================ */
+/* Two-tier header shared by every loss worksheet:
+   [labels…] | FY PY | Cumulative PY | Cumulative CY | [tail…]        */
+const QUAD = ["Sent MU","Sold MU","Loss MU","% Loss"];
+const TAIL = ["% Loss Decreased","Mus Loss Decreased","Target for Mus Loss",
+              "Shortfall for Mus Loss","Per Month Mus Loss Reduction Required"];
+
+function lossTable(labels, rows, opts){
+  opts = opts || {};
+  const t = el("table");
+  const thead = el("thead");
+  const r1 = el("tr"), r2 = el("tr");
+
+  labels.forEach(L => { const th = el("th",null,L); th.rowSpan = 2; r1.appendChild(th); });
+  [ S.pyLabel,
+    "Cummulative T&D Losses - " + S.pyLabel,
+    "Cummulative T&D Losses - " + S.cyLabel ].forEach((L,i) => {
+    const th = el("th",null,L); th.colSpan = 4; if(i) th.className = "blk1"; r1.appendChild(th);
+  });
+  TAIL.forEach(L => { const th = el("th",null,L); th.rowSpan = 2; th.className = "blk1"; r1.appendChild(th); });
+  for(let b=0;b<3;b++) QUAD.forEach((q,i) => {
+    const th = el("th","n"+(b&&!i?" blk1":""),q); r2.appendChild(th);
+  });
+  thead.append(r1,r2); t.appendChild(thead);
+
+  const tb = el("tbody");
+  rows.forEach(rw => {
+    const tr = el("tr");
+    if(rw.cls) tr.className = rw.cls;
+    rw.labels.forEach(v => {
+      const td = el("td","t");
+      if(v && v.feeder){ const a = el("span","fdr",v.text); a.onclick = () => openFeeder(v.feeder); td.appendChild(a); }
+      else td.textContent = txt(v);
+      tr.appendChild(td);
+    });
+    [rw.fy, rw.cpy, rw.ccy].forEach((blk,b) => blk.forEach((v,i) => {
+      const td = el("td","n"+(b&&!i?" blk1":""), i===3 ? f2(v) : f3(v));
+      tr.appendChild(td);
+    }));
+    rw.tail.forEach((v,i) => {
+      const td = el("td","n"+(i?"":" blk1"), i<2 ? f2(v) : f3(v));
+      const n = num(v);
+      if(i<2 && n!==null) td.classList.add(n < 0 ? "neg" : "pos");
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+  return t;
+}
+const slice4 = (r,i) => [r[i],r[i+1],r[i+2],r[i+3]];
+const tail5  = (r,m) => [r[m.PCT],r[m.MU],r[m.TGT],r[m.SHF],r[m.PM]];
+
+function feederRow(r){
+  return { labels:[ txt(r[F.DIV]), txt(r[F.SDCD]), txt(r[F.SDN]), txt(r[F.FDR]),
+                    {text:txt(r[F.NAME]), feeder:r}, txt(r[F.CAT]), txt(r[F.HIGH]) ],
+           fy:slice4(r,F.FY), cpy:slice4(r,F.CPY), ccy:slice4(r,F.CCY), tail:tail5(r,F) };
+}
+function wrap(node){ const w = el("div","tblwrap"); w.appendChild(node); return w; }
+
+/* ================================================================
+   3. TAB DEFINITIONS
+   ================================================================ */
+const TABS = [
+  {id:"circle",   group:"Worksheets", nav:"Circle",             title:"Circle worksheet",
+   desc:"Category-wise cumulative losses for the whole Baroda O&M Circle."},
+  {id:"divcat",   group:"Worksheets", nav:"Div Cat",            title:"Division \u00d7 category",
+   desc:"Every division broken down by feeder category."},
+  {id:"sdnwise",  group:"Worksheets", nav:"SDn Wise",           title:"Sub-division wise",
+   desc:"All 26 sub-divisions with cumulative losses and reduction targets."},
+  {id:"sdncat",   group:"Worksheets", nav:"SDn Cat",            title:"Sub-division \u00d7 category",
+   desc:"Filter by division, or leave it on \u201cAll divisions\u201d for the full circle."},
+  {id:"feeders",  group:"Worksheets", nav:"Feeders",            title:"Feeders worksheet",
+   desc:"Every feeder in the circle. Filter by division and sub-division, or search by name or code."},
+
+  {id:"lossup",   group:"Loss increase", nav:"% Loss increased", title:"Feeders where % loss increased",
+   desc:"Only feeders whose loss went up against last year, worst first. Ordered ascending on % Loss Decreased."},
+  {id:"muup",     group:"Loss increase", nav:"MU loss increased", title:"Feeders where MU loss increased",
+   desc:"Only feeders whose loss in MU went up against last year, worst first. Ordered ascending on Mus Loss Decreased."},
+
+  {id:"slab",     group:"Summaries", nav:"Slab summary",        title:"Sub-divisions by loss slab",
+   desc:"Each division's sub-divisions sorted into loss bands, taken from column P of the SDn Wise sheet."},
+  {id:"criteria", group:"Summaries", nav:"Feeders over criteria", title:"Feeders above the loss criteria",
+   desc:"Feeders breaching their category threshold on cumulative loss. Click any feeder name for its full monthly record."},
+  {id:"verify",   group:"Summaries", nav:"Month verification",  title:"Month-wise unit verification",
+   desc:"Search a feeder, then check its sent, sold and MU loss month by month. Swings beyond 5% are highlighted."}
+];
+
+function buildNav(){
+  const nav = $("#nav"); nav.innerHTML = "";
+  let last = null;
+  TABS.forEach(t => {
+    if(t.group !== last){ nav.appendChild(el("div","grp",t.group)); last = t.group; }
+    const b = el("button",null,t.nav);
+    b.dataset.tab = t.id;
+    b.onclick = () => showTab(t.id);
+    nav.appendChild(b);
+  });
+}
+function buildPanels(){
+  const p = $("#panels"); p.innerHTML = "";
+  TABS.forEach(t => {
+    const d = el("div","panel"); d.id = "p-" + t.id;
+    const head = el("div","phead");
+    const left = el("div");
+    left.appendChild(el("h2",null,t.title));
+    left.appendChild(el("p",null,t.desc));
+    const tools = el("div","tools");
+    if(t.id === "circle"){
+      const pa = el("button","filebtn","Print all worksheets"); pa.onclick = printAll; tools.appendChild(pa);
+      const ax = el("button","ghost","All sheets \u2192 Excel"); ax.onclick = exportAllExcel; tools.appendChild(ax);
+      const ap = el("button","ghost","All sheets \u2192 PDF"); ap.onclick = exportAllPdf; tools.appendChild(ap);
+    }
+    const bx = el("button","ghost","Excel"); bx.onclick = () => exportTabExcel(t.id); tools.appendChild(bx);
+    const bp = el("button","ghost","PDF");   bp.onclick = () => exportTabPdf(t.id);   tools.appendChild(bp);
+    const br = el("button","ghost","Print"); br.onclick = () => window.print();        tools.appendChild(br);
+    head.append(left,tools);
+    d.appendChild(head);
+    d.appendChild(el("div","body"));
+    p.appendChild(d);
+  });
+}
+function bodyOf(id){ return $("#p-"+id+" .body"); }
+
+function showTab(id){
+  S.active = id;
+  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.tab === id));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id === "p-"+id));
+  if(!S.rendered[id]){ RENDER[id](); S.rendered[id] = true; }
+  window.scrollTo(0,0);
+}
+function invalidate(){ S.rendered = {}; renderAll(); }
+function renderAll(){ TABS.forEach(t => { if(!S.rendered[t.id]){ RENDER[t.id](); S.rendered[t.id] = true; } }); }
+
+/* ================================================================
+   4. RENDERERS
+   ================================================================ */
+const RENDER = {};
+
+/* ---- Circle ---- */
+RENDER.circle = function(){
+  const b = bodyOf("circle"); b.innerHTML = "";
+
+  const wo = S.circle.find(r => /without/i.test(txt(r[CI.CAT])));
+  const wi = S.circle.find(r => /with\s*ag/i.test(txt(r[CI.CAT])) && !/without/i.test(txt(r[CI.CAT])));
+  if(wo){
+    const cy = num(wo[CI.CCY+3]), py = num(wo[CI.CPY+3]), dec = num(wo[CI.PCT]);
+    const hero = el("div","hero");
+    const l = el("div");
+    l.appendChild(el("div","big", cy===null ? "\u2014" : cy.toFixed(2) + "%"));
+    l.appendChild(el("div","biglab","Cumulative T&D loss without AG, " + S.cyLabel + " up to " + S.month));
+    hero.appendChild(l);
+    const mk = (v,lab,cls) => { const m = el("div","m");
+      const vv = el("div","v",v); if(cls) vv.classList.add(cls); m.appendChild(vv);
+      m.appendChild(el("div","l",lab)); return m; };
+    hero.appendChild(mk(py===null?"\u2014":py.toFixed(2)+"%", "Same period last year"));
+    hero.appendChild(mk((dec===null?"\u2014":(dec>0?"\u2212":"+") + Math.abs(dec).toFixed(2) + " pp"),
+                        dec!==null && dec>0 ? "Loss reduced against last year" : "Loss increased against last year",
+                        dec!==null && dec>0 ? "down" : "up"));
+    hero.appendChild(mk(f3(wo[CI.CCY+2]) + " MU", "Units lost so far this year"));
+    if(wi) hero.appendChild(mk(f2(wi[CI.CCY+3]) + "%", "Including AG feeders"));
+    b.appendChild(hero);
+  }
+
+  const rows = S.circle.map(r => ({
+    cls: /with/i.test(txt(r[CI.CAT])) ? "tot" : "",
+    labels:[txt(r[CI.CAT])], fy:slice4(r,CI.FY), cpy:slice4(r,CI.CPY),
+    ccy:slice4(r,CI.CCY), tail:tail5(r,CI)
+  }));
+  b.appendChild(wrap(lossTable(["Category"], rows)));
+};
+
+/* ---- Div Cat ---- */
+RENDER.divcat = function(){
+  const b = bodyOf("divcat"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const sel = divSelect(); bar.appendChild(sel);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = sel.value;
+    const rs = S.divCat.filter(r => !d || txt(r[DC.DIV]) === d);
+    cnt.textContent = rs.length + " rows";
+    host.innerHTML = "";
+    host.appendChild(wrap(lossTable(["Division","Category"], rs.map(r => ({
+      cls: /with/i.test(txt(r[DC.CAT])) ? "tot" : "",
+      labels:[txt(r[DC.DIV]), txt(r[DC.CAT])],
+      fy:slice4(r,DC.FY), cpy:slice4(r,DC.CPY), ccy:slice4(r,DC.CCY), tail:tail5(r,DC)
+    })))));
+  };
+  sel.onchange = draw; draw();
+};
+
+/* ---- SDn Wise ---- */
+RENDER.sdnwise = function(){
+  const b = bodyOf("sdnwise"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const sel = divSelect(); bar.appendChild(sel);
+  bar.appendChild(el("label",null,"Sort"));
+  const sort = el("select");
+  [["sheet","Workbook order"],["loss","Highest % loss first"],["dec","Biggest increase first"]]
+    .forEach(([v,l]) => sort.appendChild(new Option(l,v)));
+  bar.appendChild(sort);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = sel.value;
+    let rs = S.sdnWise.filter(r => !d || txt(r[SW.DIV]) === d);
+    if(sort.value === "loss") rs = rs.slice().sort((a,c) => (num(c[SW.CCY+3])||-1e9) - (num(a[SW.CCY+3])||-1e9));
+    if(sort.value === "dec")  rs = rs.slice().sort((a,c) => (num(a[SW.PCT])||0) - (num(c[SW.PCT])||0));
+    cnt.textContent = rs.length + " sub-divisions";
+    host.innerHTML = "";
+    host.appendChild(wrap(lossTable(["Division","Sdn Code","Sub-Division"], rs.map(r => ({
+      labels:[txt(r[SW.DIV]), txt(r[SW.SDCD]), txt(r[SW.SDN])],
+      fy:slice4(r,SW.FY), cpy:slice4(r,SW.CPY), ccy:slice4(r,SW.CCY), tail:tail5(r,SW)
+    })))));
+  };
+  sel.onchange = draw; sort.onchange = draw; draw();
+};
+
+/* ---- SDn Cat ---- */
+RENDER.sdncat = function(){
+  const b = bodyOf("sdncat"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const dSel = divSelect(); bar.appendChild(dSel);
+  bar.appendChild(el("label",null,"Sub-division"));
+  const sSel = el("select"); bar.appendChild(sSel);
+  bar.appendChild(el("label",null,"Category"));
+  const cSel = el("select"); cSel.appendChild(new Option("All categories",""));
+  bar.appendChild(cSel);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const fillCats = () => {
+    const seen = [];
+    S.sdnCat.forEach(r => { const c = txt(r[SC.CAT]); if(c && !seen.includes(c)) seen.push(c); });
+    cSel.innerHTML = ""; cSel.appendChild(new Option("All categories",""));
+    seen.forEach(c => cSel.appendChild(new Option(c,c)));
+  };
+  const draw = () => {
+    const d = dSel.value, s = sSel.value, c = cSel.value;
+    const rs = S.sdnCat.filter(r => (!d || txt(r[SC.DIV])===d) && (!s || txt(r[SC.SDN])===s)
+                                 && (!c || txt(r[SC.CAT])===c));
+    cnt.textContent = rs.length + " rows";
+    host.innerHTML = "";
+    host.appendChild(wrap(lossTable(["Division","Sdn Code","Sub-Division","Category"], rs.map(r => ({
+      cls: /with/i.test(txt(r[SC.CAT])) ? "tot" : "",
+      labels:[txt(r[SC.DIV]), txt(r[SC.SDCD]), txt(r[SC.SDN]), txt(r[SC.CAT])],
+      fy:slice4(r,SC.FY), cpy:slice4(r,SC.CPY), ccy:slice4(r,SC.CCY), tail:tail5(r,SC)
+    })))));
+  };
+  dSel.onchange = () => { fillSub(sSel, dSel.value); draw(); };
+  sSel.onchange = draw; cSel.onchange = draw;
+  fillCats(); fillSub(sSel, ""); draw();
+};
+
+/* ---- Feeders ---- */
+RENDER.feeders = function(){
+  const b = bodyOf("feeders"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const dSel = divSelect(); bar.appendChild(dSel);
+  bar.appendChild(el("label",null,"Sub-division"));
+  const sSel = el("select"); bar.appendChild(sSel);
+  bar.appendChild(el("label",null,"Category"));
+  const cSel = el("select"); cSel.appendChild(new Option("All categories",""));
+  CATS.forEach(c => cSel.appendChild(new Option(c,c)));
+  bar.appendChild(cSel);
+  const q = el("input"); q.type = "search"; q.placeholder = "Feeder name or code";
+  bar.appendChild(q);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = dSel.value, s = sSel.value, c = cSel.value, k = q.value.trim().toLowerCase();
+    const rs = S.feeders.filter(r =>
+      (!d || txt(r[F.DIV])===d) && (!s || txt(r[F.SDN])===s) && (!c || txt(r[F.CAT])===c) &&
+      (!k || txt(r[F.NAME]).toLowerCase().includes(k) || txt(r[F.FDR]).toLowerCase().includes(k)));
+    cnt.textContent = rs.length + " of " + S.feeders.length + " feeders";
+    host.innerHTML = "";
+    host.appendChild(wrap(lossTable(
+      ["Division Name","Sdn Code","Sub-Divn","Fdr_code","Feeder Name","Category","High Loss Selected"],
+      rs.map(feederRow))));
+  };
+  dSel.onchange = () => { fillSub(sSel, dSel.value); draw(); };
+  sSel.onchange = draw; cSel.onchange = draw; q.oninput = draw;
+  fillSub(sSel, ""); draw();
+};
+
+/* ---- Loss increased (shared by the % and MU tabs) ---- */
+function renderIncrease(tabId, col, unit){
+  const b = bodyOf(tabId); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const dSel = divSelect(); bar.appendChild(dSel);
+  bar.appendChild(el("label",null,"Category"));
+  const cSel = el("select");
+  cSel.appendChild(new Option("All categories \u2014 grouped",""));
+  CATS.forEach(c => cSel.appendChild(new Option(c,c)));
+  bar.appendChild(cSel);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+
+  b.appendChild(el("div","note",
+    "Listed worst first: the feeder whose loss rose the most sits at the top. " +
+    "Feeders that improved are left out of this view."));
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = dSel.value, c = cSel.value;
+    const base = S.feeders.filter(r => (!d || txt(r[F.DIV])===d) && num(r[col]) !== null && num(r[col]) < 0);
+    const groups = c ? [c] : CATS;
+    host.innerHTML = "";
+    let total = 0;
+    groups.forEach(cat => {
+      const rs = base.filter(r => txt(r[F.CAT]) === cat)
+                     .sort((a,z) => num(a[col]) - num(z[col]));
+      total += rs.length;
+      const h = el("div","sec", cat);
+      h.appendChild(el("span",null, rs.length ? rs.length + " feeder" + (rs.length>1?"s":"") + " with higher loss" : "none"));
+      host.appendChild(h);
+      if(!rs.length){ host.appendChild(el("div","empty","No feeder in this category shows an increase.")); return; }
+      host.appendChild(wrap(lossTable(
+        ["Division Name","Sdn Code","Sub-Divn","Fdr_code","Feeder Name","Category","High Loss Selected"],
+        rs.map(feederRow))));
+    });
+    cnt.textContent = total + " feeders with " + unit + " increase";
+  };
+  dSel.onchange = draw; cSel.onchange = draw; draw();
+}
+RENDER.lossup = () => renderIncrease("lossup", F.PCT, "% loss");
+RENDER.muup   = () => renderIncrease("muup",   F.MU,  "MU loss");
+
+/* ---- Slab summary ---- */
+RENDER.slab = function(){
+  const b = bodyOf("slab"); b.innerHTML = "";
+  b.appendChild(el("div","note",
+    "Each sub-division is placed by its cumulative " + S.cyLabel +
+    " % loss (SDn Wise, column P). Sub-divisions running a negative loss fall in the first band."));
+  b.appendChild(el("div","sec","Sub-divisions by loss band"));
+
+  const t = el("table");
+  const thead = el("thead");
+  const r0 = el("tr");
+  const th0 = el("th",null,"% loss wise breakup of number of sub-divisions");
+  th0.colSpan = 1 + SLABS.length; r0.appendChild(th0);
+  const r1 = el("tr");
+  r1.appendChild(el("th",null,"Division"));
+  SLABS.forEach(s => r1.appendChild(el("th",null,s.label)));
+  thead.append(r0,r1); t.appendChild(thead);
+
+  const tb = el("tbody");
+  const totals = SLABS.map(() => 0);
+  S.divisions.forEach(d => {
+    const tr = el("tr");
+    tr.appendChild(el("td","t",d));
+    SLABS.forEach((s,i) => {
+      const hits = S.sdnWise.filter(r => txt(r[SW.DIV])===d && num(r[SW.CCY+3])!==null && s.test(num(r[SW.CCY+3])));
+      totals[i] += hits.length;
+      const td = el("td","t chips");
+      if(!hits.length) td.textContent = "\u2014";
+      hits.forEach((r,k) => {
+        if(k) td.appendChild(document.createTextNode(", "));
+        td.appendChild(document.createTextNode(txt(r[SW.SDN]) + " (" + f2(r[SW.CCY+3]) + ")"));
+      });
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  const tr = el("tr","tot");
+  tr.appendChild(el("td","t","Circle total"));
+  totals.forEach(n => tr.appendChild(el("td","c", String(n))));
+  tb.appendChild(tr);
+  t.appendChild(tb);
+  b.appendChild(wrap(t));
+
+  /* supporting detail: the underlying figures */
+  b.appendChild(el("div","sec","Sub-division loss figures used above"));
+  const t2 = el("table");
+  const h = el("thead"); const hr = el("tr");
+  ["Division","Sdn Code","Sub-Division","Cumulative % loss " + S.cyLabel,
+   "Cumulative % loss " + S.pyLabel, "% Loss Decreased", "Band"]
+   .forEach(x => hr.appendChild(el("th",null,x)));
+  h.appendChild(hr); t2.appendChild(h);
+  const b2 = el("tbody");
+  S.sdnWise.forEach(r => {
+    const v = num(r[SW.CCY+3]);
+    const band = v===null ? "" : (SLABS.find(s => s.test(v)) || {}).label || "";
+    const tr = el("tr");
+    [[txt(r[SW.DIV]),"t"],[txt(r[SW.SDCD]),"t"],[txt(r[SW.SDN]),"t"],
+     [f2(r[SW.CCY+3]),"n"],[f2(r[SW.CPY+3]),"n"],[f2(r[SW.PCT]),"n"],[band,"c"]]
+      .forEach(([val,cls],i) => {
+        const td = el("td",cls,val);
+        if(i===5){ const n = num(r[SW.PCT]); if(n!==null) td.classList.add(n<0?"neg":"pos"); }
+        tr.appendChild(td);
+      });
+    b2.appendChild(tr);
+  });
+  t2.appendChild(b2);
+  b.appendChild(wrap(t2));
+};
+
+/* ---- Feeders over criteria ---- */
+RENDER.criteria = function(){
+  const b = bodyOf("criteria"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division"));
+  const dSel = divSelect(); bar.appendChild(dSel);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  b.appendChild(el("div","note",
+    "Threshold applied to each feeder's cumulative " + S.cyLabel +
+    " % loss (Feeders, column T). Click a feeder name to open its full record."));
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = dSel.value;
+    host.innerHTML = "";
+    const t = el("table");
+    const thead = el("thead");
+    const r0 = el("tr");
+    const th0 = el("th",null,"% loss wise feeders as per criteria");
+    th0.colSpan = 2 + CRITERIA.length; r0.appendChild(th0);
+    const r1 = el("tr"), r2 = el("tr");
+    ["Division Name","Sub Division Name"].forEach(x => { const th = el("th",null,x); th.rowSpan = 2; r1.appendChild(th); });
+    CRITERIA.forEach(c => r1.appendChild(el("th",null,c.label)));
+    CRITERIA.forEach(c => r2.appendChild(el("th",null,"> " + c.t + "%")));
+    thead.append(r0,r1,r2); t.appendChild(thead);
+
+    const tb = el("tbody");
+    let hits = 0;
+    S.divisions.filter(x => !d || x === d).forEach(div => {
+      (S.subdivs[div] || []).forEach(sd => {
+        const cells = CRITERIA.map(c =>
+          S.feeders.filter(r => txt(r[F.DIV])===div && txt(r[F.SDN])===sd && txt(r[F.CAT])===c.key
+                             && num(r[F.CCY+3])!==null && num(r[F.CCY+3]) > c.t)
+                   .sort((a,z) => num(z[F.CCY+3]) - num(a[F.CCY+3])));
+        const n = cells.reduce((a,c) => a + c.length, 0);
+        if(!n) return;
+        hits += n;
+        const tr = el("tr");
+        tr.appendChild(el("td","t",div));
+        tr.appendChild(el("td","t",sd));
+        cells.forEach(list => {
+          const td = el("td","t chips");
+          if(!list.length){ td.textContent = "\u2014"; }
+          list.forEach((r,k) => {
+            if(k) td.appendChild(document.createTextNode(", "));
+            const a = el("span","fdr", txt(r[F.NAME]) + " " + f2(r[F.CCY+3]) + "%");
+            a.onclick = () => openFeeder(r);
+            td.appendChild(a);
+          });
+          tr.appendChild(td);
+        });
+        tb.appendChild(tr);
+      });
+    });
+    if(!tb.children.length){
+      const tr = el("tr"); const td = el("td","c","No feeder breaches these thresholds.");
+      td.colSpan = 2 + CRITERIA.length; tr.appendChild(td); tb.appendChild(tr);
+    }
+    t.appendChild(tb);
+    cnt.textContent = hits + " feeders over criteria";
+    host.appendChild(wrap(t));
+  };
+  dSel.onchange = draw; draw();
+};
+
+/* ---- Month-wise unit verification ---- */
+RENDER.verify = function(){
+  const b = bodyOf("verify"); b.innerHTML = "";
+  const bar = el("div","filters");
+  const q = el("input"); q.type = "search"; q.placeholder = "Type a feeder name or code";
+  q.style.minWidth = "300px";
+  bar.appendChild(el("label",null,"Find feeder"));
+  bar.appendChild(q);
+  const raw = el("input"); raw.type = "checkbox"; raw.id = "rawchk"; raw.checked = S.rawLoss;
+  const rl = el("label"); rl.htmlFor = "rawchk"; rl.style.display = "flex"; rl.style.gap = "5px";
+  rl.appendChild(raw); rl.appendChild(document.createTextNode("Show Loss MU exactly as stored in the sheet"));
+  bar.appendChild(rl);
+  b.appendChild(bar);
+
+  const list = el("div","results"); list.style.display = "none";
+  b.appendChild(list);
+  const host = el("div"); b.appendChild(host);
+  host.appendChild(el("div","empty","Search for a feeder above to see its month-by-month figures."));
+
+  let current = null;
+  const show = r => { current = r; host.innerHTML = ""; host.appendChild(feederDetail(r)); };
+
+  const search = () => {
+    const k = q.value.trim().toLowerCase();
+    if(k.length < 2){ list.style.display = "none"; return; }
+    const hit = S.feeders.filter(r => txt(r[F.NAME]).toLowerCase().includes(k)
+                                   || txt(r[F.FDR]).toLowerCase().includes(k)).slice(0,60);
+    list.innerHTML = "";
+    if(!hit.length){ list.appendChild(el("div",null,"No feeder matches that.")); }
+    hit.forEach(r => {
+      const d = el("div");
+      d.appendChild(el("b",null, txt(r[F.NAME])));
+      d.appendChild(document.createTextNode(
+        "  \u00b7  " + txt(r[F.FDR]) + "  \u00b7  " + txt(r[F.CAT]) +
+        "  \u00b7  " + txt(r[F.SDN]) + ", " + txt(r[F.DIV]) + " Div."));
+      d.onclick = () => { list.style.display = "none"; q.value = txt(r[F.NAME]); show(r); };
+      list.appendChild(d);
+    });
+    list.style.display = "block";
+  };
+  q.oninput = search;
+  q.onfocus = search;
+  raw.onchange = () => {
+    S.rawLoss = raw.checked;
+    if(current) show(current);
+    if($("#modal").classList.contains("on") && modalFeeder) openFeeder(modalFeeder);
+  };
+};
+
+/* builds the full record for one feeder: summary + 3 monthly tables */
+function feederDetail(r){
+  const box = el("div");
+
+  box.appendChild(el("div","sec","Cumulative position"));
+  box.appendChild(wrap(lossTable(
+    ["Fdr_code","Feeder Name","Category","High Loss Selected"],
+    [{ labels:[txt(r[F.FDR]), txt(r[F.NAME]), txt(r[F.CAT]), txt(r[F.HIGH])],
+       fy:slice4(r,F.FY), cpy:slice4(r,F.CPY), ccy:slice4(r,F.CCY), tail:tail5(r,F) }])));
+
+  const scale = S.rawLoss ? 1 : 0.1;   // monthly Loss MU is stored at 10x (Sent - Sold)
+  const metrics = [
+    {title:"Sent out unit verification", off:0, dp:3, k:1},
+    {title:"Sold out unit verification", off:1, dp:3, k:1},
+    {title:"MU loss verification",       off:2, dp:3, k:scale}
+  ];
+  metrics.forEach(m => {
+    const h = el("div","sec", m.title);
+    if(m.off === 2 && !S.rawLoss)
+      h.appendChild(el("span",null,"shown as sent minus sold; the sheet stores this column at ten times that value"));
+    box.appendChild(h);
+
+    const t = el("table");
+    const thead = el("thead"); const hr = el("tr");
+    ["Month", "As per " + S.pyLabel, "As per " + S.cyLabel, "Change", "% change"]
+      .forEach(x => hr.appendChild(el("th",null,x)));
+    thead.appendChild(hr); t.appendChild(thead);
+    const tb = el("tbody");
+    let sp = 0, sc = 0;
+    FY_MONTHS.forEach((mn,i) => {
+      const py = num(r[monthPY(i) + m.off]), cy = num(r[monthCY(i) + m.off]);
+      const p = py===null ? null : py * m.k, c = cy===null ? null : cy * m.k;
+      if(p!==null) sp += p; if(c!==null) sc += c;
+      const diff = (p!==null && c!==null) ? c - p : null;
+      const pctv = (p!==null && c!==null && Math.abs(p) > 1e-9) ? (c - p) / Math.abs(p) * 100 : null;
+      const tr = el("tr");
+      if(i > S.monthIdx) tr.style.opacity = ".45";
+      if(pctv !== null && Math.abs(pctv) > 5) tr.className = "hl";
+      tr.appendChild(el("td","t",mn));
+      tr.appendChild(el("td","n", p===null ? "" : p.toFixed(m.dp)));
+      tr.appendChild(el("td","n", c===null ? "" : c.toFixed(m.dp)));
+      tr.appendChild(el("td","n", diff===null ? "" : diff.toFixed(m.dp)));
+      const tp = el("td","n", pctv===null ? "" : pctv.toFixed(2));
+      if(pctv!==null) tp.classList.add(pctv < 0 ? "neg" : "pos");
+      tr.appendChild(tp);
+      tb.appendChild(tr);
+    });
+    const tr = el("tr","tot");
+    const dif = sc - sp, pv = Math.abs(sp) > 1e-9 ? (sc - sp)/Math.abs(sp)*100 : null;
+    tr.appendChild(el("td","t","Total"));
+    tr.appendChild(el("td","n", sp.toFixed(m.dp)));
+    tr.appendChild(el("td","n", sc.toFixed(m.dp)));
+    tr.appendChild(el("td","n", dif.toFixed(m.dp)));
+    tr.appendChild(el("td","n", pv===null ? "" : pv.toFixed(2)));
+    tb.appendChild(tr);
+    t.appendChild(tb);
+    box.appendChild(wrap(t));
+  });
+
+  box.appendChild(el("div","note",
+    "Rows shaded amber move more than 5% between " + S.pyLabel + " and " + S.cyLabel +
+    ". Months after " + S.month + " are dimmed because " + S.cyLabel + " has no data there yet."));
+  return box;
+}
+
+/* ---- feeder modal ---- */
+let modalFeeder = null;
+function openFeeder(r){
+  modalFeeder = r;
+  $("#modalTitle").textContent = txt(r[F.NAME]) + "  \u00b7  " + txt(r[F.FDR]) + "  \u00b7  " +
+                                 txt(r[F.CAT]) + "  \u00b7  " + txt(r[F.SDN]) + ", " + txt(r[F.DIV]) + " Div.";
+  const body = $("#modalBody"); body.innerHTML = "";
+  body.appendChild(feederDetail(r));
+  $("#modal").classList.add("on");
+  document.body.style.overflow = "hidden";
+}
+function closeModal(){ $("#modal").classList.remove("on"); document.body.style.overflow = ""; }
+
+/* ---- shared filter widgets ---- */
+function divSelect(){
+  const s = el("select");
+  s.appendChild(new Option("All divisions",""));
+  S.divisions.forEach(d => s.appendChild(new Option(d,d)));
+  return s;
+}
+function fillSub(sel, div){
+  sel.innerHTML = "";
+  sel.appendChild(new Option("All sub-divisions",""));
+  const list = div ? (S.subdivs[div] || [])
+                   : S.divisions.reduce((a,d) => a.concat(S.subdivs[d] || []), []);
+  list.forEach(s => sel.appendChild(new Option(s,s)));
+}
+
+/* ================================================================
+   5. EXPORTS
+   ================================================================ */
+const safe = s => s.replace(/[^A-Za-z0-9 _-]/g,"").replace(/\s+/g," ").trim().slice(0,28) || "Sheet";
+const stamp = () => new Date().toISOString().slice(0,10);
+
+function tablesIn(node){ return Array.from(node.querySelectorAll("table")); }
+function titleFor(id){ return (TABS.find(t => t.id === id) || {}).title || id; }
+function navFor(id){ return (TABS.find(t => t.id === id) || {}).nav || id; }
+
+/* Inactive panels are display:none, and both SheetJS and autoTable skip hidden
+   DOM. Reveal every panel for the duration of an export, then put it back. */
+function withPanelsVisible(fn){
+  document.body.classList.add("exporting");
+  try { return fn(); } finally { document.body.classList.remove("exporting"); }
+}
+function sheetFromTable(tbl){ return XLSX.utils.table_to_sheet(tbl, {raw:false}); }
+function addTabSheets(wb, id, node){
+  const tbls = tablesIn(node);
+  if(!tbls.length) return;
+  if(tbls.length === 1){
+    XLSX.utils.book_append_sheet(wb, sheetFromTable(tbls[0]), safe(navFor(id)));
+  } else {
+    tbls.forEach((t,i) => {
+      const sec = t.closest(".tblwrap") && t.closest(".tblwrap").previousElementSibling;
+      const nm = sec && sec.classList && sec.classList.contains("sec")
+                 ? navFor(id).slice(0,12) + " " + sec.firstChild.textContent
+                 : navFor(id) + " " + (i+1);
+      XLSX.utils.book_append_sheet(wb, sheetFromTable(t), safe(nm) + "_" + (i+1));
+    });
+  }
+}
+function exportTabExcel(id){
+  const wb = XLSX.utils.book_new();
+  withPanelsVisible(() => addTabSheets(wb, id, bodyOf(id)));
+  if(!wb.SheetNames.length) return alert("There is nothing to export on this tab yet.");
+  XLSX.writeFile(wb, "TD Loss " + safe(navFor(id)) + " " + stamp() + ".xlsx");
+}
+function exportAllExcel(){
+  const wb = XLSX.utils.book_new();
+  renderAll();
+  withPanelsVisible(() => TABS.forEach(t => addTabSheets(wb, t.id, bodyOf(t.id))));
+  if(!wb.SheetNames.length) return alert("Load a workbook first.");
+  XLSX.writeFile(wb, "TD Loss Analysis BOMC " + S.month + " " + stamp() + ".xlsx");
+}
+
+function newPdf(){
+  const { jsPDF } = window.jspdf;
+  return new jsPDF({orientation:"landscape", unit:"pt", format:"a3"});
+}
+function pdfSection(doc, heading, node, first){
+  const tbls = tablesIn(node);
+  if(!tbls.length) return first;
+  tbls.forEach((t,i) => {
+    if(!first) doc.addPage();
+    first = false;
+    doc.setFontSize(13); doc.setTextColor(20,33,43);
+    doc.text(heading + (tbls.length > 1 ? "  \u2014  part " + (i+1) : ""), 28, 34);
+    doc.setFontSize(8); doc.setTextColor(84,102,111);
+    doc.text("Baroda O&M Circle  \u00b7  T&D month: " + S.month +
+             "  \u00b7  " + S.pyLabel + " vs " + S.cyLabel + "  \u00b7  generated " + stamp(), 28, 48);
+    doc.autoTable({
+      html: t, startY: 58, theme: "grid",
+      styles:{fontSize:5.4, cellPadding:1.6, overflow:"linebreak", lineColor:[214,221,227], lineWidth:.3},
+      headStyles:{fillColor:[238,243,245], textColor:[22,35,45], fontStyle:"bold", fontSize:5.4},
+      bodyStyles:{textColor:[22,35,45]},
+      alternateRowStyles:{fillColor:[250,252,253]},
+      margin:{left:20, right:20, bottom:26}
+    });
+  });
+  return first;
+}
+function exportTabPdf(id){
+  if(!tablesIn(bodyOf(id)).length) return alert("There is nothing to export on this tab yet.");
+  const doc = newPdf();
+  withPanelsVisible(() => pdfSection(doc, titleFor(id), bodyOf(id), true));
+  doc.save("TD Loss " + safe(navFor(id)) + " " + stamp() + ".pdf");
+}
+function exportAllPdf(){
+  renderAll();
+  const doc = newPdf();
+  withPanelsVisible(() => {
+    let first = true;
+    TABS.forEach(t => { first = pdfSection(doc, titleFor(t.id), bodyOf(t.id), first); });
+  });
+  doc.save("TD Loss Analysis BOMC " + S.month + " " + stamp() + ".pdf");
+}
+function printAll(){
+  renderAll();
+  document.body.classList.add("printall");
+  const done = () => { document.body.classList.remove("printall"); window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  setTimeout(() => window.print(), 120);
+}
+
+/* modal exports */
+$("#mXls").onclick = () => {
+  const wb = XLSX.utils.book_new();
+  tablesIn($("#modalBody")).forEach((t,i) =>
+    XLSX.utils.book_append_sheet(wb, sheetFromTable(t), ["Cumulative","Sent out","Sold out","MU loss"][i] || ("T"+i)));
+  XLSX.writeFile(wb, "Feeder " + safe(txt(modalFeeder[F.NAME])) + " " + stamp() + ".xlsx");
+};
+$("#mPdf").onclick = () => {
+  const doc = newPdf();
+  pdfSection(doc, txt(modalFeeder[F.NAME]) + " \u00b7 " + txt(modalFeeder[F.FDR]), $("#modalBody"), true);
+  doc.save("Feeder " + safe(txt(modalFeeder[F.NAME])) + " " + stamp() + ".pdf");
+};
+$("#mClose").onclick = closeModal;
+$("#modal").onclick = e => { if(e.target.id === "modal") closeModal(); };
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
+
+/* ================================================================
+   6. FILE LOADING
+   ================================================================ */
+function handleFile(file){
+  const fr = new FileReader();
+  $("#status").textContent = "Reading " + file.name + "\u2026";
+  fr.onload = e => {
+    try{
+      parseWorkbook(new Uint8Array(e.target.result), file.name);
+      $("#landing").style.display = "none";
+      const ms = $("#monthSel");
+      ms.innerHTML = ""; ms.disabled = false;
+      FY_MONTHS.forEach(m => ms.appendChild(new Option(m,m)));
+      ms.value = S.month;
+      ms.onchange = () => { S.month = ms.value; S.monthIdx = FY_MONTHS.indexOf(S.month); updateStatus(); invalidate(); };
+      buildNav(); buildPanels(); updateStatus(); renderAll(); showTab("circle");
+    }catch(err){
+      $("#status").textContent = "Could not read that file.";
+      alert("Could not read that workbook.\n\n" + err.message);
+    }
+  };
+  fr.onerror = () => { $("#status").textContent = "Could not read that file."; };
+  fr.readAsArrayBuffer(file);
+}
+function updateStatus(){
+  $("#status").innerHTML = "";
+  const b = el("b",null,S.fileName);
+  $("#status").append(b, document.createTextNode(
+    "  \u00b7  " + S.feeders.length + " feeders  \u00b7  " + S.sdnWise.length + " sub-divisions  \u00b7  " +
+    S.divisions.length + " divisions  \u00b7  " + S.pyLabel + " vs " + S.cyLabel + " up to " + S.month));
+}
+$("#file").onchange = e => { if(e.target.files[0]) handleFile(e.target.files[0]); };
+$("#pickBtn").onclick  = () => $("#file").click();
+$("#pickBtn2").onclick = () => $("#file").click();
+
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", e => { if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>
