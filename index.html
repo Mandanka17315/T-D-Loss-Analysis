@@ -7,16 +7,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>function altLib(el,url){el.onerror=null;var s=document.createElement("script");
+  s.src=url;s.async=false;document.head.appendChild(s);}</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
+        onerror="altLib(this,'https://unpkg.com/xlsx-js-style@1.2.0/dist/xlsx.bundle.js')"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+        onerror="altLib(this,'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js')"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"
+        onerror="altLib(this,'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js')"></script>
 <style>
 :root{
   --rail:#14212b; --rail-2:#1d3040; --page:#f4f7f8; --surface:#fff;
   --ink:#16232d; --ink-2:#54666f; --line:#d6dde3; --line-2:#e9eef1;
   --accent:#0b6e7f; --accent-soft:#e2f0f2;
   --alert:#b4400f; --good:#1a7f4b;
-  --f-yoy:#fdefe4; --f-mom:#fcf6e0; --f-both:#f9ddd5;
+  --hi:#fbdfcf;
+  --g1:#f4f7f8; --g2:#eef3f6; --g3:#e7f2f4; --g4:#f9f3eb;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -28,7 +34,21 @@ button{font:inherit;cursor:pointer}
 
 #shell{display:flex;min-height:100vh}
 #rail{width:238px;flex:0 0 238px;background:var(--rail);color:#c9d6dd;
-  display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+  overflow:hidden;transition:width .18s ease,flex-basis .18s ease}
+#rail>*{min-width:238px}
+body.railoff #rail{width:0;flex-basis:0}
+#scrim{display:none;position:fixed;inset:0;background:rgba(16,32,42,.45);z-index:50}
+#railToggle{background:none;border:1px solid var(--line);border-radius:5px;
+  padding:7px 9px;line-height:0;color:var(--ink-2)}
+#railToggle:hover{border-color:var(--accent);color:var(--accent)}
+#railToggle svg{display:block}
+@media (max-width:900px){
+  #rail{position:fixed;left:0;top:0;z-index:60;flex-basis:238px;width:238px;
+        box-shadow:6px 0 24px rgba(16,32,42,.28)}
+  body:not(.railoff) #scrim{display:block}
+  body.railoff #rail{box-shadow:none}
+}
 #rail .brand{padding:20px 18px 16px;border-bottom:1px solid rgba(255,255,255,.09)}
 #rail .brand .t{color:#fff;font-size:15px;font-weight:600;line-height:1.25}
 #rail .brand .s{font-size:12px;color:#7f97a4;margin-top:3px}
@@ -43,7 +63,6 @@ button{font:inherit;cursor:pointer}
 
 #topbar{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;
   display:flex;gap:16px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:40}
-#status{font-size:14px;font-weight:600}
 .filebtn{background:var(--accent);color:#fff;border:0;border-radius:5px;padding:8px 15px;font-weight:500}
 .filebtn:hover{background:#095a68}
 .ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:7px 13px}
@@ -64,36 +83,74 @@ select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);ou
 .filters label{font-size:12.5px;color:var(--ink-2)}
 .count{font-size:12.5px;color:var(--ink-2);margin-left:auto}
 
-.hero{background:var(--rail);color:#fff;border-radius:8px;padding:22px 24px;margin-bottom:18px;
-  display:flex;gap:38px;align-items:flex-end;flex-wrap:wrap}
-.hero .big{font-size:52px;font-weight:600;line-height:.95;letter-spacing:-.03em}
-.hero .biglab{font-size:12.5px;color:#8fa8b5;margin-top:7px;max-width:22ch}
-.hero .m{border-left:1px solid rgba(255,255,255,.16);padding-left:26px}
-.hero .m .v{font-size:23px;font-weight:600}
-.hero .m .l{font-size:12px;color:#8fa8b5;margin-top:2px}
+.hero{background:var(--rail);color:#fff;border-radius:8px;padding:20px 24px;margin-bottom:18px;
+  display:flex;gap:34px;align-items:stretch;flex-wrap:wrap}
+.hero .hblk{flex:1 1 260px;min-width:240px}
+.hero .hblk+.hblk{border-left:1px solid rgba(255,255,255,.16);padding-left:32px}
+.hero .big{font-size:46px;font-weight:600;line-height:.95;letter-spacing:-.03em}
+.hero .biglab{font-size:13px;color:#a7bcc7;margin-top:8px}
+.hero .hsub{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:12.5px;color:#8fa8b5}
+.hero .hsub span{white-space:nowrap}
+.hero .hmeta{border-left:1px solid rgba(255,255,255,.16);padding-left:32px;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.hero .hmeta .v{font-size:20px;font-weight:600}
+.hero .hmeta .l{font-size:12px;color:#8fa8b5;margin-top:2px}
 .up{color:#ff9f6e}.down{color:#5fd39a}
 
 .tblwrap{background:var(--surface);border:1px solid var(--line);border-radius:6px;
   overflow:auto;max-height:calc(100vh - 250px);margin-bottom:18px}
 table{border-collapse:separate;border-spacing:0;font-size:12.5px;table-layout:fixed;min-width:100%}
 thead th{background:#14212b;color:#fff;font-weight:600;text-align:center;
-  padding:7px 8px;border-bottom:1px solid #2b4354;border-right:1px solid #2b4354;
-  position:sticky;top:0;z-index:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-thead th.g1{background:#1d3040}
-thead tr:nth-child(2) th,thead tr:nth-child(3) th{background:#2b4354;font-weight:500}
-thead tr:nth-child(2) th{top:32px;z-index:1}
-thead tr:nth-child(3) th{top:64px;z-index:1}
+  padding:7px 7px;border-bottom:1px solid #2b4354;border-right:1px solid #2b4354;
+  position:sticky;top:0;z-index:2;white-space:normal;overflow-wrap:break-word;
+  line-height:1.22;vertical-align:middle}
+thead th.h1{background:#24394a}
+thead th.h2{background:#1d3040}
+thead th.h3{background:#0b5f6e}
+thead th.h4{background:#3d4a52}
+thead tr:nth-child(2) th,thead tr:nth-child(3) th{font-weight:500;z-index:1;opacity:.94}
+thead th.gs{border-left:2px solid #7f9aa6}
 tbody td{padding:5px 8px;border-bottom:1px solid var(--line-2);border-right:1px solid var(--line-2);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-tbody tr:nth-child(even) td{background:#fafcfd}
-tbody tr:hover td{background:#eef7f9}
+tbody td.g1{background:var(--g1)}
+tbody td.g2{background:var(--g2)}
+tbody td.g3{background:var(--g3)}
+tbody td.g4{background:var(--g4)}
+tbody td.gs{border-left:2px solid #a9bcc4}
+tbody tr:hover td{background:#e3f1f4}
 td.n{text-align:right}
 td.c{text-align:center}
-tbody tr.tot td{background:#e7eef1;font-weight:600}
-tbody tr.f-yoy td{background:var(--f-yoy)}
-tbody tr.f-mom td{background:var(--f-mom)}
-tbody tr.f-both td{background:var(--f-both)}
-tbody tr.f-yoy:hover td,tbody tr.f-mom:hover td,tbody tr.f-both:hover td{filter:brightness(.97)}
+tbody tr.tot td{background:#dce6ea;font-weight:600}
+tbody tr.hi td{background:var(--hi)}
+tbody tr.hi:hover td{filter:brightness(.97)}
+tbody tr.fut td{opacity:.5}
+tbody td.t-crit{background:#f3b6a6;color:#7e2b08;font-weight:600}
+tbody td.t-high{background:#f9d6bb}
+tbody td.t-med{background:#fbebc8}
+tbody td.t-low{background:#dff0e3}
+tbody td.t-good{background:#dff0e3;color:#1a7f4b;font-weight:600}
+tbody td.hm-na{background:#e4eaee;color:#7d8f99}
+tbody td.hm0{background:#d8efdd}
+tbody td.hm1{background:#edf3cf}
+tbody td.hm2{background:#fbebc8}
+tbody td.hm3{background:#f9d6bb}
+tbody td.hm4{background:#f3b6a6}
+tbody td.hm5{background:#e08d7a;color:#5e1c05;font-weight:600}
+tbody tr:hover td[class*="hm"],tbody tr:hover td[class*="t-"]{filter:brightness(.96)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));
+  gap:16px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:13px 15px}
+.card h4{margin:0 0 2px;font-size:13.5px;font-weight:600}
+.card .cnote{font-size:12px;color:var(--ink-2);margin-bottom:4px}
+.card svg{width:100%;height:auto;display:block;overflow:visible}
+.card svg text{font-family:inherit}
+@media print{.charts{grid-template-columns:1fr 1fr}
+  .card{break-inside:avoid;page-break-inside:avoid}}
+.keyline{display:flex;gap:18px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
+  border-radius:6px;padding:11px 13px;margin-bottom:14px;font-size:12.5px}
+.keyline div{display:flex;flex-direction:column;gap:2px}
+.keyline b{font-size:14px;font-weight:600}
+.keyline span{color:var(--ink-2)}
 .pos{color:var(--good)}.neg{color:var(--alert)}
 .sec{font-size:14px;font-weight:600;margin:20px 0 8px;padding-left:9px;border-left:3px solid var(--accent)}
 .sec span{font-weight:400;color:var(--ink-2);font-size:12.5px;margin-left:7px}
@@ -101,6 +158,15 @@ tbody tr.f-yoy:hover td,tbody tr.f-mom:hover td,tbody tr.f-both:hover td{filter:
 .lnk:hover{color:#083f49}
 td.cnt{text-align:center;font-weight:600}
 td.cnt .lnk{font-weight:600}
+.trio{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:0 18px;align-items:start;margin-bottom:6px}
+.trio .tblwrap{max-height:none}
+.trio .sec{margin-top:14px}
+.raillink{background:none;border:1px solid rgba(255,255,255,.22);color:#cfe0e8;
+  border-radius:5px;padding:5px 10px;font-size:12px;margin-top:11px;width:100%}
+.raillink:hover{border-color:#3ec7d8;color:#fff}
+#busy{display:none;position:fixed;inset:0;background:rgba(16,32,42,.42);z-index:120;
+  align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:500}
 .empty{padding:26px;text-align:center;color:var(--ink-2);background:var(--surface);
   border:1px dashed var(--line);border-radius:6px;margin-bottom:18px}
 .note{font-size:12px;color:var(--ink-2);margin:-4px 0 12px}
@@ -133,12 +199,12 @@ td.cnt .lnk{font-weight:600}
 body.exporting .panel{display:block !important}
 body.exporting .tblwrap{max-height:none;overflow:visible}
 @media print{
-  #rail,#topbar,.tools,.filters,.filebtn,.ghost,#modal,.results{display:none !important}
+  #rail,#topbar,.tools,.filters,.filebtn,.ghost,#modal,.results,#scrim,#railToggle{display:none !important}
   body{background:#fff}#content{padding:0}
   .tblwrap{max-height:none;overflow:visible;border:0}
   table{font-size:7pt}
   thead th{position:static}
-  thead th,tbody tr.tot td,tbody tr.f-yoy td,tbody tr.f-mom td,tbody tr.f-both td,.hero{
+  thead th,tbody td,tbody tr.tot td,tbody tr.hi td,.hero{
     -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .panel{display:none}.panel.on{display:block}
   body.printall .panel{display:block !important;page-break-after:always}
@@ -152,15 +218,18 @@ body.exporting .tblwrap{max-height:none;overflow:visible}
 <div id="shell">
   <aside id="rail">
     <div class="brand"><div class="t">T&amp;D Loss Analysis</div>
-      <div class="s">Baroda O&amp;M Circle Office</div></div>
+      <div class="s">Baroda O&amp;M Circle Office</div>
+      <button class="raillink" id="pickBtn">Load workbook</button></div>
     <nav id="nav"></nav>
-    <div class="foot">Prepared by A H Mandanka, Junior Engineer</div>
+    <div class="foot">Prepared by A H Mandanka, Junior Engineer, Baroda O&amp;M Circle</div>
   </aside>
   <div id="main">
     <div id="topbar">
-      <button class="filebtn" id="pickBtn">Load workbook</button>
+      <button id="railToggle" title="Show or hide the menu" aria-label="Show or hide the menu">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.7">
+          <path d="M2 4h13M2 8.5h13M2 13h13"/></svg>
+      </button>
       <input type="file" id="file" accept=".xlsm,.xlsx,.xls" style="display:none">
-      <div id="status">T&amp;D Loss Analysis BOMC</div>
       <div style="margin-left:auto;display:flex;gap:9px;align-items:center">
         <label style="font-size:12.5px;color:var(--ink-2)">T&amp;D month</label>
         <select id="monthSel" disabled></select>
@@ -179,6 +248,8 @@ body.exporting .tblwrap{max-height:none;overflow:visible}
     </div>
   </div>
 </div>
+<div id="scrim"></div>
+<div id="busy"></div>
 <div id="modal"><div id="modalBox">
   <div id="modalHead"><h3 id="modalTitle"></h3>
     <div style="display:flex;gap:8px;align-items:center">
@@ -211,9 +282,34 @@ const SLABS = [{label:"< 10%",test:v=>v<10},{label:"10% \u2013 20%",test:v=>v>=1
   {label:"20% \u2013 30%",test:v=>v>=20&&v<30},{label:"30% \u2013 40%",test:v=>v>=30&&v<40},
   {label:"40% \u2013 50%",test:v=>v>=40&&v<50},{label:"> 50%",test:v=>v>=50}];
 
+/* Per-cell colouring used by the summary rankings and the heatmap.
+   bg/fg are Excel ARGB, pbg/pfg the PDF equivalents, and the key doubles
+   as the CSS class name so all three renderers stay in step. */
+const TONE = {
+  "pos":   {fg:"FF1A7F4B", pfg:[26,127,75]},
+  "neg":   {fg:"FFB4400F", pfg:[180,64,15]},
+  "t-crit":{bg:"FFF3B6A6", pbg:[243,182,166], fg:"FF7E2B08", pfg:[126,43,8], bold:true},
+  "t-high":{bg:"FFF9D6BB", pbg:[249,214,187]},
+  "t-med": {bg:"FFFBEBC8", pbg:[251,235,200]},
+  "t-low": {bg:"FFDFF0E3", pbg:[223,240,227]},
+  "t-good":{bg:"FFDFF0E3", pbg:[223,240,227], fg:"FF1A7F4B", pfg:[26,127,75], bold:true},
+  "hm-na": {bg:"FFE4EAEE", pbg:[228,234,238]},
+  "hm0":   {bg:"FFD8EFDD", pbg:[216,239,221]},
+  "hm1":   {bg:"FFEDF3CF", pbg:[237,243,207]},
+  "hm2":   {bg:"FFFBEBC8", pbg:[251,235,200]},
+  "hm3":   {bg:"FFF9D6BB", pbg:[249,214,187]},
+  "hm4":   {bg:"FFF3B6A6", pbg:[243,182,166]},
+  "hm5":   {bg:"FFE08D7A", pbg:[224,141,122], fg:"FF5E1C05", pfg:[94,28,5], bold:true}
+};
+const HEAT = [{max:5,c:"hm0"},{max:10,c:"hm1"},{max:20,c:"hm2"},
+              {max:30,c:"hm3"},{max:40,c:"hm4"},{max:Infinity,c:"hm5"}];
+const heatCls = v => v === null ? "hm-na" : v < 0 ? "hm-na"
+                   : (HEAT.find(b => v < b.max) || HEAT[HEAT.length-1]).c;
+
 /* ---------------- column widths, in px; one source of truth -------- */
-const W = {div:96, sdcd:80, sdn:112, fdr:82, name:206, cat:64, high:60,
-           mu:76, pct:70, tail:92, band:118, names:260, cnt:74};
+const W = {div:96, sdcd:82, sdn:114, fdr:84, name:206, cat:74, high:80,
+           mu:78, pct:72, tail:100, band:118, names:260, cnt:88,
+           mon:48, cmu:64, cpct:58, rank:52, stat:112, pri:92, heat:56};
 
 const S = { raw:[], month:"Jun", mi:2, py:"2025-26", cy:"2026-27",
             divisions:[], subdivs:{}, sdnCode:{}, rawLoss:false, rendered:{}, active:"circle" };
@@ -276,16 +372,10 @@ function cumulate(r, base, upto){
   const loss = sent - sold;
   return [sent, sold, loss, pctOf(loss,sent)];
 }
-/* % loss of a single month, current year — used for the month-on-month test */
-function monthPct(r, i, py){
-  const b = py ? mPY(i) : mCY(i);
-  const sent = nz(r[b]), sold = nz(r[b+1]);
-  return sent === 0 ? null : pctOf(sent-sold, sent);
-}
-function flagsFor(cpy, ccy, thisPct, prevPct){
-  const yoy = cpy[3] - ccy[3] < 0;                                  // worse than last year
-  const mom = thisPct !== null && prevPct !== null && thisPct > prevPct;
-  return { yoy, mom, cls: yoy && mom ? "f-both" : yoy ? "f-yoy" : mom ? "f-mom" : "" };
+/* a row is flagged when cumulative loss is worse than the same period last year */
+function flagsFor(cpy, ccy){
+  const yoy = cpy[3] - ccy[3] < 0;
+  return { yoy, cls: yoy ? "hi" : "" };
 }
 function buildFeeder(r){
   const cpy = cumulate(r, mPY(0), S.mi), ccy = cumulate(r, mCY(0), S.mi);
@@ -300,7 +390,7 @@ function buildFeeder(r){
     cpy, ccy, pctDec:cpy[3]-ccy[3], muDec, target, shortfall,
     perMonth: shortfall === null ? null : (left > 0 ? shortfall/left : shortfall)
   };
-  Object.assign(o, flagsFor(cpy, ccy, monthPct(r,S.mi,false), S.mi ? monthPct(r,S.mi-1,false) : null));
+  Object.assign(o, flagsFor(cpy, ccy));
   return o;
 }
 function aggregate(rows, label){
@@ -308,8 +398,6 @@ function aggregate(rows, label){
   const cumAgg = base => { let s=0,d=0;
     for(let i=0;i<=S.mi;i++){ s+=sum(base+8*i,0); d+=sum(base+8*i,1); }
     return [s,d,s-d,pctOf(s-d,s)]; };
-  const monPct = (i,off) => { const s = sum(mCY(i),0), d = sum(mCY(i),1);
-    return s === 0 ? null : pctOf(s-d,s); };
   const cpy = cumAgg(mPY(0)), ccy = cumAgg(mCY(0));
   const target = rows.some(f=>f.target!==null) ? rows.reduce((a,f)=>a+nz(f.target),0) : null;
   const muDec = cpy[2]-ccy[2], shortfall = target===null?null:target-muDec, left = 12-(S.mi+1);
@@ -318,7 +406,7 @@ function aggregate(rows, label){
     cpy, ccy, pctDec:cpy[3]-ccy[3], muDec, target, shortfall,
     perMonth: shortfall===null?null:(left>0?shortfall/left:shortfall) };
   o.fy[3] = pctOf(o.fy[2], o.fy[0]);
-  Object.assign(o, flagsFor(cpy, ccy, monPct(S.mi), S.mi ? monPct(S.mi-1) : null));
+  Object.assign(o, flagsFor(cpy, ccy));
   return o;
 }
 function catSets(rows){
@@ -359,19 +447,21 @@ const TAIL = ["% Loss Decreased","Mus Loss Decreased","Target for Mus Loss",
               "Shortfall for Mus Loss","Per Month Mus Loss Reduction Required"];
 
 function lossVM(title, labelCols, recs){
-  const cols = labelCols.map(c => ({w:c.w, type:"text", align:"left"}));
+  const cols = labelCols.map(c => ({w:c.w, type:"text", align:"left", g:0}));
   for(let b=0;b<3;b++) QUAD.forEach((q,i) =>
-    cols.push({w:i===3?W.pct:W.mu, type:i===3?"pct":"mu", align:"right"}));
-  TAIL.forEach((t,i) => cols.push({w:W.tail, type:i<2?"pct":"mu", align:"right"}));
+    cols.push({w:i===3?W.pct:W.mu, type:i===3?"pct":"mu", align:"right",
+               g:b+1, gs:i===0}));
+  TAIL.forEach((t,i) => cols.push({w:W.tail, type:i<2?"pct":"mu", align:"right",
+                                   g:4, gs:i===0}));
   cols[cols.length-4].type = "mu";                       // Mus Loss Decreased is MU
   cols[cols.length-5].type = "pct";
 
-  const r1 = labelCols.map(c => ({t:c.h, rs:2}));
-  r1.push({t:S.py, cs:4});
-  r1.push({t:"Cummulative T&D Losses - "+S.py, cs:4, g:1});
-  r1.push({t:"Cummulative T&D Losses - "+S.cy, cs:4, g:1});
-  TAIL.forEach(t => r1.push({t, rs:2, g:1}));
-  const r2 = []; for(let b=0;b<3;b++) QUAD.forEach(q => r2.push({t:q, g:b?1:0}));
+  const r1 = labelCols.map(c => ({t:c.h, rs:2, g:0}));
+  r1.push({t:S.py, cs:4, g:1, gs:true});
+  r1.push({t:"Cummulative T&D Losses - "+S.py, cs:4, g:2, gs:true});
+  r1.push({t:"Cummulative T&D Losses - "+S.cy, cs:4, g:3, gs:true});
+  TAIL.forEach((t,i) => r1.push({t, rs:2, g:4, gs:i===0}));
+  const r2 = []; for(let b=0;b<3;b++) QUAD.forEach((q,i) => r2.push({t:q, g:b+1, gs:i===0}));
 
   const rows = recs.map(rec => {
     const f = rec.rec, cells = rec.labels.map(v => (v && v.click) ? v : {v:txt(v)});
@@ -399,7 +489,7 @@ function renderVM(vm){
 
   const th = el("thead");
   vm.head.forEach(hr => { const tr = el("tr");
-    hr.forEach(h => { const c = el("th", h.g?"g1":null, h.t);
+    hr.forEach(h => { const c = el("th", (h.g?"h"+h.g:"")+(h.gs?" gs":""), h.t);
       if(h.cs) c.colSpan = h.cs; if(h.rs) c.rowSpan = h.rs;
       c.title = h.t; tr.appendChild(c); });
     th.appendChild(tr); });
@@ -410,7 +500,8 @@ function renderVM(vm){
     const tr = el("tr", r.cls || null);
     r.cells.forEach((cell,i) => {
       const col = vm.cols[i] || {type:"text"};
-      const td = el("td", (col.align==="right"?"n":col.align==="center"?"c":"") + (cell.cls?" "+cell.cls:""));
+      const td = el("td", (col.align==="right"?"n":col.align==="center"?"c":"") +
+        (col.g?" g"+col.g:"") + (col.gs?" gs":"") + (cell.cls?" "+cell.cls:""));
       const s = cell.txt !== undefined ? cell.txt : fmtV(cell.v, col.type);
       if(cell.click){ const a = el("span","lnk",s); a.onclick = cell.click; td.appendChild(a); }
       else td.textContent = s;
@@ -426,12 +517,14 @@ function renderVM(vm){
 }
 
 /* ---------------- Excel renderer ---------------- */
-const XC = { head:"FF14212B", head2:"FF2B4354", grp:"FF1D3040",
-             tot:"FFDCE6EA", zebra:"FFF7FAFB",
-             yoy:"FFFDEFE4", mom:"FFFCF6E0", both:"FFF9DDD5",
-             line:"FFBFCBD2", ink:"FF16232D", pos:"FF1A7F4B", neg:"FFB4400F" };
-const bdr = { top:{style:"thin",color:{rgb:XC.line}}, bottom:{style:"thin",color:{rgb:XC.line}},
-              left:{style:"thin",color:{rgb:XC.line}}, right:{style:"thin",color:{rgb:XC.line}} };
+const XC = { hdr:["FF14212B","FF24394A","FF1D3040","FF0B5F6E","FF3D4A52"],
+             tint:["FFFFFFFF","FFF4F7F8","FFEEF3F6","FFE7F2F4","FFF9F3EB"],
+             tot:"FFDCE6EA", hi:"FFFBDFCF",
+             line:"FFBFCBD2", div:"FF8AA3AE", ink:"FF16232D",
+             pos:"FF1A7F4B", neg:"FFB4400F" };
+const thin = {style:"thin",color:{rgb:XC.line}};
+const bd = gs => ({ top:thin, bottom:thin, right:thin,
+                    left: gs ? {style:"medium",color:{rgb:XC.div}} : thin });
 
 function vmToSheet(vm){
   const nc = vm.cols.length, grid = [], styles = [], merges = [];
@@ -444,9 +537,9 @@ function vmToSheet(vm){
       while(occupied[ri+"_"+ci]) ci++;
       const cs = h.cs||1, rs = h.rs||1;
       grid[ri][ci] = h.t;
-      styles[ri][ci] = { fill:{fgColor:{rgb: ri ? XC.head2 : (h.g?XC.grp:XC.head)}},
+      styles[ri][ci] = { fill:{fgColor:{rgb: XC.hdr[h.g||0]}},
         font:{color:{rgb:"FFFFFFFF"},bold:true,sz:9,name:"Calibri"},
-        alignment:{horizontal:"center",vertical:"center",wrapText:true}, border:bdr };
+        alignment:{horizontal:"center",vertical:"center",wrapText:true}, border:bd(h.gs) };
       if(cs>1||rs>1) merges.push({s:{r:ri,c:ci},e:{r:ri+rs-1,c:ci+cs-1}});
       for(let a=0;a<rs;a++) for(let b=0;b<cs;b++) occupied[(ri+a)+"_"+(ci+b)] = true;
       ci += cs;
@@ -463,16 +556,17 @@ function vmToSheet(vm){
       grid[ri][ci] = col.type === "text"
         ? (cell.txt !== undefined ? cell.txt : txt(cell.v))
         : (n === null ? "" : n);
+      const tone = TONE[cell.cls] || null;
       const fill = r.tot ? XC.tot
-                 : r.flag === "f-both" ? XC.both : r.flag === "f-yoy" ? XC.yoy
-                 : r.flag === "f-mom" ? XC.mom : (i % 2 ? XC.zebra : "FFFFFFFF");
+                 : (tone && tone.bg) ? tone.bg
+                 : r.flag === "hi" ? XC.hi : XC.tint[col.g||0];
       styles[ri][ci] = {
         fill:{fgColor:{rgb:fill}},
-        font:{sz:9.5, name:"Calibri", bold:!!r.tot,
-              color:{rgb: cell.cls==="pos"?XC.pos : cell.cls==="neg"?XC.neg : XC.ink}},
+        font:{sz:9.5, name:"Calibri", bold:!!r.tot || !!(tone && tone.bold),
+              color:{rgb: (tone && tone.fg) ? tone.fg : XC.ink}},
         alignment:{horizontal: col.align==="right"?"right":col.align==="center"?"center":"left",
                    vertical:"center"},
-        border:bdr,
+        border:bd(col.gs),
         numFmt: col.type==="mu" ? "0.000" : col.type==="pct" ? "0.00" : col.type==="int" ? "0" : undefined
       };
     });
@@ -493,9 +587,10 @@ function vmToSheet(vm){
 }
 
 /* ---------------- PDF renderer ---------------- */
-const P = { head:[20,33,43], head2:[43,67,84], grp:[29,48,64], tot:[220,230,234],
-            yoy:[253,239,228], mom:[252,246,224], both:[249,221,213],
-            zebra:[247,250,251], ink:[22,35,45], pos:[26,127,75], neg:[180,64,15] };
+const P = { hdr:[[20,33,43],[36,57,74],[29,48,64],[11,95,110],[61,74,82]],
+            tint:[[255,255,255],[244,247,248],[238,243,246],[231,242,244],[249,243,235]],
+            tot:[220,230,234], hi:[251,223,207],
+            ink:[22,35,45], pos:[26,127,75], neg:[180,64,15] };
 function newPdf(){ const {jsPDF} = window.jspdf;
   return new jsPDF({orientation:"landscape", unit:"pt", format:"a3"}); }
 
@@ -512,15 +607,18 @@ function pdfVM(doc, vm, first, subtitle){
   doc.setFontSize(8); doc.setTextColor(84,102,111);
   doc.text(subtitle, margin, 44);
 
-  const head = vm.head.map((hr,ri) => hr.map(h => ({
+  const head = vm.head.map(hr => hr.map(h => ({
     content:h.t, colSpan:h.cs||1, rowSpan:h.rs||1,
-    styles:{fillColor: ri ? P.head2 : (h.g?P.grp:P.head),
-            textColor:[255,255,255], fontStyle:"bold", halign:"center"}
+    styles:{fillColor: P.hdr[h.g||0], textColor:[255,255,255],
+            fontStyle:"bold", halign:"center"}
   })));
   const body = vm.rows.map(r => r.cells.map((cell,i) => {
     const col = vm.cols[i] || {type:"text"};
-    return { content: cell.txt !== undefined ? cell.txt : fmtV(cell.v, col.type),
-             styles: cell.cls==="pos" ? {textColor:P.pos} : cell.cls==="neg" ? {textColor:P.neg} : {} };
+    const tone = TONE[cell.cls];
+    const st = {};
+    if(tone && tone.pfg) st.textColor = tone.pfg;
+    if(tone && tone.bold) st.fontStyle = "bold";
+    return { content: cell.txt !== undefined ? cell.txt : fmtV(cell.v, col.type), styles: st };
   }));
   const colStyles = {};
   vm.cols.forEach((c,i) => colStyles[i] = { cellWidth: c.w*k,
@@ -537,11 +635,12 @@ function pdfVM(doc, vm, first, subtitle){
     didParseCell: d => {
       if(d.section !== "body") return;
       const r = vm.rows[d.row.index]; if(!r) return;
+      const col = vm.cols[d.column.index] || {};
+      const tone = TONE[(r.cells[d.column.index]||{}).cls];
       if(r.tot){ d.cell.styles.fillColor = P.tot; d.cell.styles.fontStyle = "bold"; }
-      else if(r.flag === "f-both") d.cell.styles.fillColor = P.both;
-      else if(r.flag === "f-yoy")  d.cell.styles.fillColor = P.yoy;
-      else if(r.flag === "f-mom")  d.cell.styles.fillColor = P.mom;
-      else if(d.row.index % 2)     d.cell.styles.fillColor = P.zebra;
+      else if(tone && tone.pbg) d.cell.styles.fillColor = tone.pbg;
+      else if(r.flag === "hi") d.cell.styles.fillColor = P.hi;
+      else d.cell.styles.fillColor = P.tint[col.g||0];
     },
     didDrawPage: d => {
       const ph = doc.internal.pageSize.getHeight();
@@ -567,6 +666,8 @@ const TABS = [
    d:"Filter by division and sub-division, or leave both on \u201call\u201d for the full circle."},
   {id:"feeders", g:"Worksheets", nav:"Feeders",  t:"Feeders worksheet",
    d:"Every feeder in the circle, filterable by division, sub-division and category."},
+  {id:"flsummary",g:"Analysis", nav:"Feeder Loss Summary", t:"Feeder loss summary",
+   d:"How many feeders are gaining and how many are losing ground, by category. Click any count to list those feeders."},
   {id:"lossup",  g:"Analysis", nav:"Loss Increased", t:"Feeders where loss increased",
    d:"Only feeders that went backwards against last year, worst first. Choose whether to rank on % loss or on MU loss."},
   {id:"highloss",g:"Analysis", nav:"High Loss Feeders", t:"Selected high loss feeders",
@@ -575,8 +676,16 @@ const TABS = [
    d:"Each division's sub-divisions sorted into loss bands on cumulative % loss."},
   {id:"stat",    g:"Analysis", nav:"Feeder Statistical", t:"Feeder statistical",
    d:"Count of feeders breaching each category threshold. Click any number to list them."},
-  {id:"verify",  g:"Analysis", nav:"Monthly T&D Verification", t:"Monthly T&D verification",
-   d:"Search a feeder, then check sent, sold and MU loss month by month."}
+  {id:"verify",  g:"Verification", nav:"Feeder wise Monthly T&D Verification",
+   t:"Feeder wise monthly T&D verification",
+   d:"Search a feeder, then check sent, sold and MU loss month by month."},
+  {id:"catverify",g:"Verification", nav:"Category wise Verification",
+   t:"Feeder category wise monthly T&D verification",
+   d:"The same month-by-month comparison for a whole division, sub-division or category rather than one feeder."},
+  {id:"summary", g:"Summary", nav:"Summary", t:"Summary",
+   d:"Rankings and a monthly heatmap for review meetings. Pick a view below."},
+  {id:"trends",  g:"Summary", nav:"Monthly Trends", t:"Monthly trends",
+   d:"Month-by-month charts at circle, division, sub-division or feeder level."}
 ];
 const tabOf = id => TABS.find(t => t.id === id) || {};
 
@@ -585,7 +694,8 @@ function buildNav(){
   TABS.forEach(t => {
     if(t.g !== last){ nav.appendChild(el("div","grp",t.g)); last = t.g; }
     const b = el("button",null,t.nav); b.dataset.tab = t.id;
-    b.onclick = () => showTab(t.id); nav.appendChild(b);
+    b.onclick = () => { showTab(t.id); if(narrow()) setRail(false); };
+    nav.appendChild(b);
   });
 }
 function buildPanels(){
@@ -613,6 +723,7 @@ function showTab(id){
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.tab===id));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("on", p.id==="p-"+id));
   if(!S.rendered[id]){ RENDER[id](); S.rendered[id] = true; }
+  queueSticky();
   window.scrollTo && window.scrollTo(0,0);
 }
 function renderAll(){ TABS.forEach(t => { if(!S.rendered[t.id]){ RENDER[t.id](); S.rendered[t.id] = true; } }); }
@@ -620,9 +731,7 @@ function rebuild(){ buildModel(); S.rendered = {}; renderAll(); }
 
 function legend(){
   const d = el("div","legend");
-  [["--f-yoy","loss higher than last year"],
-   ["--f-mom","loss higher than last month"],
-   ["--f-both","higher than both"]].forEach(([v,l]) => {
+  [["--hi","loss higher than the same period last year"]].forEach(([v,l]) => {
     const s = el("span"); const i = el("i");
     i.style.background = getComputedStyle(document.documentElement).getPropertyValue(v);
     s.appendChild(i); s.appendChild(document.createTextNode(l)); d.appendChild(s);
@@ -644,19 +753,28 @@ RENDER.circle = function(){
   const b = bodyOf("circle"); b.innerHTML = "";
   const wo = M.circle.find(r => r.label === "Without AG"),
         wi = M.circle.find(r => r.label === "With AG");
-  if(wo){
-    const hero = el("div","hero"), l = el("div");
-    l.appendChild(el("div","big", wo.ccy[3].toFixed(2)+"%"));
-    l.appendChild(el("div","biglab","Cumulative T&D loss without AG, "+S.cy+" up to "+S.month));
-    hero.appendChild(l);
-    const mk = (v,lab,cls) => { const m = el("div","m"), vv = el("div","v",v);
-      if(cls) vv.classList.add(cls); m.appendChild(vv); m.appendChild(el("div","l",lab)); return m; };
-    hero.appendChild(mk(wo.cpy[3].toFixed(2)+"%","Same period last year"));
-    hero.appendChild(mk((wo.pctDec>0?"\u2212":"+")+Math.abs(wo.pctDec).toFixed(2)+" pp",
-      wo.pctDec>0?"Loss reduced against last year":"Loss increased against last year",
-      wo.pctDec>0?"down":"up"));
-    hero.appendChild(mk(wo.ccy[2].toFixed(3)+" MU","Units lost so far this year"));
-    if(wi) hero.appendChild(mk(wi.ccy[3].toFixed(2)+"%","Including AG feeders"));
+  if(wo || wi){
+    const hero = el("div","hero");
+    const block = (rec, caption) => {
+      if(!rec) return;
+      const d = el("div","hblk");
+      d.appendChild(el("div","big", rec.ccy[3].toFixed(2)+"%"));
+      d.appendChild(el("div","biglab", caption));
+      const sub = el("div","hsub");
+      sub.appendChild(el("span",null, rec.cpy[3].toFixed(2)+"% last year"));
+      const dl = el("span", rec.pctDec>0?"down":"up",
+        (rec.pctDec>0?"\u2193 ":"\u2191 ")+Math.abs(rec.pctDec).toFixed(2)+" pp");
+      sub.appendChild(dl);
+      sub.appendChild(el("span",null, rec.ccy[2].toFixed(3)+" MU lost"));
+      d.appendChild(sub);
+      hero.appendChild(d);
+    };
+    block(wo, "Cumulative T&D loss \u2014 without AG");
+    block(wi, "Cumulative T&D loss \u2014 with AG");
+    const meta = el("div","hmeta");
+    meta.appendChild(el("div","v", S.cy));
+    meta.appendChild(el("div","l", "up to "+S.month+", against "+S.py));
+    hero.appendChild(meta);
     b.appendChild(hero);
   }
   b.appendChild(el("div","note", M.feeders.length+" feeders \u00b7 "+M.sdnWise.length+
@@ -757,6 +875,599 @@ RENDER.feeders = function(){
   sS.onchange = draw; cS.onchange = draw; q.oninput = draw; fillSub(sS,""); draw();
 };
 
+
+
+/* ================================================================
+   Inline SVG line charts. Hand-drawn rather than pulled from a CDN,
+   so the trend tab keeps working on a restricted network.
+   ================================================================ */
+const SVGNS = "http://www.w3.org/2000/svg";
+const svgEl = (tag, at) => { const e = document.createElementNS(SVGNS, tag);
+  for(const k in at) e.setAttribute(k, at[k]); return e; };
+const LINES = ["#0b6e7f","#b4400f","#1a7f4b","#5c5a8d","#a5761b","#2b6cb0","#7a3b6a","#496b7a"];
+
+/* pick a round axis step so the gridlines land on sensible numbers */
+function niceStep(span){
+  const raw = span/5, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  return ([1,2,2.5,5,10].map(m => m*mag).find(s => s >= raw)) || 10*mag;
+}
+function chartSVG(cfg){
+  const w = 760, ht = 300, ml = 60, mr = 14, mt = 30, mb = 38;
+  const iw = w-ml-mr, ih = ht-mt-mb;
+  const vals = [];
+  cfg.series.forEach(s => s.data.forEach(v => { if(v !== null && isFinite(v)) vals.push(v); }));
+  if(!vals.length) return null;
+
+  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if(lo > 0) lo = 0;
+  if(hi < 0) hi = 0;
+  if(hi === lo) hi = lo + 1;
+  const step = niceStep(hi-lo);
+  lo = Math.floor(lo/step)*step; hi = Math.ceil(hi/step)*step;
+
+  const n = cfg.labels.length;
+  const X = i => ml + (n < 2 ? iw/2 : i*iw/(n-1));
+  const Y = v => mt + ih - (v-lo)/(hi-lo)*ih;
+  const dp = cfg.dp === undefined ? 1 : cfg.dp;
+  const svg = svgEl("svg", {viewBox:"0 0 "+w+" "+ht, role:"img"});
+
+  /* gridlines and y labels */
+  for(let v = lo; v <= hi + 1e-9; v += step){
+    const y = Y(v), zero = Math.abs(v) < 1e-9;
+    svg.appendChild(svgEl("line", {x1:ml, x2:ml+iw, y1:y, y2:y,
+      stroke: zero ? "#9fb3bd" : "#e4ebee", "stroke-width": zero ? 1.2 : 1}));
+    const t = svgEl("text", {x:ml-8, y:y+3.5, "text-anchor":"end",
+      "font-size":10.5, fill:"#6a7d87"});
+    t.textContent = (Math.abs(v) < 1e-9 ? 0 : v).toFixed(step < 1 ? 1 : 0);
+    svg.appendChild(t);
+  }
+  /* x labels */
+  cfg.labels.forEach((l,i) => {
+    const t = svgEl("text", {x:X(i), y:mt+ih+16, "text-anchor":"middle",
+      "font-size":10.5, fill:"#6a7d87"});
+    t.textContent = l; svg.appendChild(t);
+  });
+  if(cfg.yLabel){
+    const t = svgEl("text", {x:ml-8, y:mt-12, "text-anchor":"end",
+      "font-size":10.5, fill:"#8b9aa3"});
+    t.textContent = cfg.yLabel; svg.appendChild(t);
+  }
+  /* series: broken into segments so gaps stay gaps */
+  cfg.series.forEach((s,si) => {
+    const col = s.color || LINES[si % LINES.length];
+    let run = [];
+    const flush = () => {
+      if(run.length > 1){
+        svg.appendChild(svgEl("polyline", {points:run.map(p => p[0]+","+p[1]).join(" "),
+          fill:"none", stroke:col, "stroke-width":s.dash?1.6:2.1,
+          "stroke-dasharray": s.dash ? "5 4" : "",
+          "stroke-linejoin":"round", "stroke-linecap":"round"}));
+      }
+      run = [];
+    };
+    s.data.forEach((v,i) => {
+      if(v === null || !isFinite(v)){ flush(); return; }
+      run.push([X(i), Y(v)]);
+    });
+    flush();
+    s.data.forEach((v,i) => {
+      if(v === null || !isFinite(v)) return;
+      const c = svgEl("circle", {cx:X(i), cy:Y(v), r:s.dash?2.4:3.1, fill:col});
+      const ttl = svgEl("title");
+      ttl.textContent = s.name+"  "+cfg.labels[i]+": "+v.toFixed(dp)+(cfg.unit||"");
+      c.appendChild(ttl); svg.appendChild(c);
+    });
+  });
+  /* legend */
+  let lx = ml;
+  cfg.series.forEach((s,si) => {
+    const col = s.color || LINES[si % LINES.length];
+    svg.appendChild(svgEl("line", {x1:lx, x2:lx+16, y1:mt-14, y2:mt-14, stroke:col,
+      "stroke-width":2.1, "stroke-dasharray": s.dash ? "5 4" : ""}));
+    const t = svgEl("text", {x:lx+21, y:mt-10.5, "font-size":11, fill:"#4a5b64"});
+    t.textContent = s.name; svg.appendChild(t);
+    lx += 30 + s.name.length*6.1;
+  });
+  return svg;
+}
+function chartCard(title, note, cfg){
+  const c = el("div","card");
+  c.appendChild(el("h4",null,title));
+  if(note) c.appendChild(el("div","cnote",note));
+  const s = chartSVG(cfg);
+  c.appendChild(s || el("div","cnote","No data to plot for this selection."));
+  return c;
+}
+/* the two-year comparison used almost everywhere */
+const yoyCfg = (ser, unit, dp) => ({labels:MONTHS, unit, dp,
+  series:[{name:S.py, data:ser.py, color:"#93a9b4", dash:true},
+          {name:S.cy, data:ser.cy, color:"#0b6e7f"}]});
+
+/* ================================================================
+   Monthly trend tab
+   ================================================================ */
+const TREND_LEVELS = [["circle","Circle"],["div","Division"],
+                      ["sdn","Sub-division"],["fdr","Feeder"]];
+/* key, label, unit, decimals */
+const TREND_METRICS = [["pct","Loss %","%",2],["loss","Loss MU"," MU",3],
+                       ["sent","Sent MU"," MU",3],["sold","Sold MU"," MU",3]];
+
+RENDER.trends = function(){
+  const b = bodyOf("trends"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Level"));
+  const lS = el("select"); TREND_LEVELS.forEach(([v,l]) => lS.appendChild(new Option(l,v)));
+  bar.appendChild(lS);
+  const dWrap = el("span"); dWrap.style.display = "contents";
+  dWrap.appendChild(el("label",null,"Division")); const dS = divSelect(); dWrap.appendChild(dS);
+  bar.appendChild(dWrap);
+  const sWrap = el("span"); sWrap.style.display = "contents";
+  sWrap.appendChild(el("label",null,"Sub-division")); const sS = el("select"); sWrap.appendChild(sS);
+  bar.appendChild(sWrap);
+  const cWrap = el("span"); cWrap.style.display = "contents";
+  cWrap.appendChild(el("label",null,"Category")); const cS = el("select");
+  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
+  cWrap.appendChild(cS); bar.appendChild(cWrap);
+  const q = el("input"); q.type = "search"; q.placeholder = "Feeder name or code";
+  q.style.minWidth = "240px"; q.style.display = "none"; bar.appendChild(q);
+  bar.appendChild(el("label",null,"Chart"));
+  const mS = el("select"); mS.appendChild(new Option("All charts",""));
+  TREND_METRICS.forEach(([k,l]) => mS.appendChild(new Option(l,k)));
+  bar.appendChild(mS);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const list = el("div","results"); list.style.display = "none"; b.appendChild(list);
+  const host = el("div"); b.appendChild(host);
+
+  const scope = () => M.feeders.filter(f =>
+    (!dS.value || f.div === dS.value) && (!sS.value || f.sdn === sS.value) &&
+    (!cS.value || f.cat === cS.value));
+
+  /* which metrics to draw: the chosen one, or all four */
+  const picked = () => mS.value ? TREND_METRICS.filter(m => m[0] === mS.value) : TREND_METRICS;
+  /* small-multiple views plot a single metric, so “all” falls back to % loss */
+  const single = () => TREND_METRICS.find(m => m[0] === (mS.value || "pct"));
+  const multiNote = () => mS.value ? "" :
+    " The per-unit charts plot loss percentage; pick a single metric above to plot units instead.";
+
+  /* a table under each pair of charts keeps the numbers exportable */
+  const addTable = (title, ser) => host.appendChild(renderVM(monthCompareVM(title, ser)));
+
+  function viewCircle(){
+    const rows = scope();
+    cnt.textContent = rows.length+" feeders";
+    const name = [dS.value||"Whole circle", sS.value, cS.value].filter(Boolean).join(" \u00b7 ");
+    host.appendChild(el("div","note",
+      "Each month on its own, April to March, this year against last. "+
+      S.cy+" stops after "+S.month+" because that is as far as the data goes."));
+    const g = el("div","charts");
+    picked().forEach(([k,l,u,dp]) => g.appendChild(chartCard(l+" by month \u2014 "+name,
+      k === "pct" ? "monthly loss percentage, not cumulative" : "",
+      yoyCfg(monthSeries(rows,k,false),u,dp))));
+    host.appendChild(g);
+    host.appendChild(el("div","sec","Monthly % loss behind the charts"));
+    addTable(name+" \u2014 monthly % loss", monthSeries(rows,"pct",false));
+  }
+
+  function viewDiv(){
+    const rows = scope();
+    cnt.textContent = rows.length+" feeders";
+    const divs = S.divisions.filter(d => !dS.value || d === dS.value);
+    const one = single();
+    host.appendChild(el("div","note",
+      "All divisions on one axis first, then each division against its own last year."+multiNote()));
+    const combined = el("div","charts");
+    picked().forEach(([k,l,u,dp]) => combined.appendChild(
+      chartCard("Monthly "+l+" by division \u2014 "+S.cy, "one line per division",
+        {labels:MONTHS, unit:u, dp,
+         series: divs.map((d,i) => ({name:d, color:LINES[i%LINES.length],
+           data: monthSeries(rows.filter(f => f.div === d),k,false).cy}))})));
+    host.appendChild(combined);
+    const g = el("div","charts");
+    divs.forEach(d => g.appendChild(chartCard(d+" division",
+      one[1]+", "+S.cy+" against "+S.py,
+      yoyCfg(monthSeries(rows.filter(f => f.div === d),one[0],false),one[2],one[3]))));
+    host.appendChild(g);
+
+    host.appendChild(el("div","sec","Monthly "+one[1]+" by division"));
+    const cols = [{w:W.mon,type:"text",align:"left",g:0}]
+      .concat(divs.map((d,i) => ({w:W.tail,type:one[0]==="pct"?"pct":"mu",align:"right",g:3,gs:i===0})));
+    const head = [[{t:"Month",g:0}].concat(divs.map((d,i) => ({t:d,g:3,gs:i===0})))];
+    const ser = divs.map(d => monthSeries(rows.filter(f => f.div === d),one[0],false).cy);
+    const rws = MONTHS.map((m,i) => ({cells:[{v:m}].concat(ser.map(s => ({v:s[i]}))),
+      cls:i > S.mi ? "fut" : ""}));
+    host.appendChild(renderVM({title:"Monthly "+one[1]+" by division \u2014 "+S.cy, cols, head, rows:rws}));
+  }
+
+  function viewSdn(){
+    const rows = scope();
+    cnt.textContent = rows.length+" feeders";
+    if(sS.value){
+      host.appendChild(el("div","note","Monthly trend for "+sS.value+", this year against last."));
+      const g = el("div","charts");
+      picked().forEach(([k,l,u,dp]) => g.appendChild(
+        chartCard(sS.value+" \u2014 "+l+" by month","", yoyCfg(monthSeries(rows,k,false),u,dp))));
+      host.appendChild(g);
+      host.appendChild(el("div","sec","Monthly % loss behind the charts"));
+      addTable(sS.value+" \u2014 monthly % loss", monthSeries(rows,"pct",false));
+      return;
+    }
+    const pairs = [];
+    S.divisions.filter(d => !dS.value || d === dS.value).forEach(d =>
+      (S.subdivs[d]||[]).forEach(s => pairs.push([d,s])));
+    const one = single();
+    host.appendChild(el("div","note",
+      "Every sub-division in scope, "+S.cy+" against "+S.py+
+      ". Pick one above for a closer look at its units as well."+multiNote()));
+    const g = el("div","charts");
+    pairs.forEach(([d,s]) => g.appendChild(chartCard(s,
+      d+" division \u00b7 "+one[1],
+      yoyCfg(monthSeries(rows.filter(f => f.sdn === s),one[0],false),one[2],one[3]))));
+    host.appendChild(g);
+
+    host.appendChild(el("div","sec","Monthly "+one[1]+" by sub-division"));
+    const cols = [{w:W.div,type:"text",align:"left",g:0},{w:W.sdn,type:"text",align:"left",g:0}]
+      .concat(MONTHS.map((m,i) => ({w:W.heat,type:one[0]==="pct"?"pct":"mu",align:"right",g:3,gs:i===0})));
+    const head = [[{t:"Division",g:0},{t:"Sub-Division",g:0}]
+      .concat(MONTHS.map((m,i) => ({t:m,g:3,gs:i===0})))];
+    const rws = pairs.map(([d,s]) => {
+      const ser = monthSeries(rows.filter(f => f.sdn === s),one[0],false).cy;
+      return {cells:[{v:d},{v:s}].concat(ser.map(v =>
+        ({v, cls: one[0]==="pct" ? heatCls(v) : ""})))};
+    });
+    host.appendChild(renderVM({title:"Monthly "+one[1]+" by sub-division \u2014 "+S.cy,
+      cols, head, rows:rws}));
+  }
+
+  let current = null;
+  function viewFeeder(){
+    if(!current){
+      cnt.textContent = "";
+      host.appendChild(el("div","empty","Search for a feeder above to plot its monthly trend."));
+      return;
+    }
+    const f = current;
+    cnt.textContent = f.fdr+" \u00b7 "+f.cat;
+    host.appendChild(el("div","note", f.name+" \u2014 "+f.sdn+", "+f.div+" division. "+
+      "MU loss is sent minus sold."));
+    const g = el("div","charts");
+    picked().forEach(([k,l,u,dp]) => g.appendChild(
+      chartCard(f.name+" \u2014 "+l, "", yoyCfg(monthSeries([f],k,false),u,dp))));
+    host.appendChild(g);
+    host.appendChild(el("div","sec","Monthly figures behind the charts"));
+    const trio = el("div","trio");
+    METRICS.forEach(([title,mode]) => { const cell = el("div");
+      cell.appendChild(el("div","sec",title));
+      cell.appendChild(renderVM(monthCompareVM(f.name+" \u2014 "+title, monthSeries([f],mode,false))));
+      trio.appendChild(cell); });
+    host.appendChild(trio);
+  }
+
+  const search = () => {
+    const k = q.value.trim().toLowerCase();
+    if(k.length < 2){ list.style.display = "none"; return; }
+    const hit = M.feeders.filter(f => f.name.toLowerCase().includes(k)
+      || f.fdr.toLowerCase().includes(k)).slice(0,60);
+    list.innerHTML = "";
+    if(!hit.length) list.appendChild(el("div",null,"No feeder matches that."));
+    hit.forEach(f => { const d = el("div");
+      d.appendChild(el("b",null,f.name));
+      d.appendChild(document.createTextNode("  \u00b7  "+f.fdr+"  \u00b7  "+f.cat+
+        "  \u00b7  "+f.sdn+", "+f.div+" Div."));
+      d.onclick = () => { list.style.display = "none"; q.value = f.name; current = f; draw(); };
+      list.appendChild(d); });
+    list.style.display = "block";
+  };
+  q.oninput = search; q.onfocus = search;
+
+  function draw(){
+    const lv = lS.value;
+    host.innerHTML = ""; list.style.display = "none";
+    q.style.display = lv === "fdr" ? "" : "none";
+    dWrap.style.display = lv === "fdr" ? "none" : "contents";
+    sWrap.style.display = (lv === "sdn" || lv === "circle") ? "contents" : "none";
+    cWrap.style.display = lv === "fdr" ? "none" : "contents";
+    if(lv === "circle") viewCircle();
+    else if(lv === "div") viewDiv();
+    else if(lv === "sdn") viewSdn();
+    else viewFeeder();
+  }
+  lS.onchange = draw; cS.onchange = draw; sS.onchange = draw; mS.onchange = draw;
+  dS.onchange = () => { fillSub(sS, dS.value); draw(); };
+  fillSub(sS,""); draw();
+};
+
+/* ================================================================
+   Summary tab: problem-feeder rankings, division / sub-division
+   league tables, and a month-by-month heatmap.
+   ================================================================ */
+const SUM_VIEWS = [["feeders","Top problem feeders"],
+                   ["units","Division and sub-division ranking"],
+                   ["heat","Monthly heatmap"]];
+
+/* A feeder trips up to three flags; the count sets its priority.
+   Judging on percentage alone would push tiny AG feeders to the top, so
+   MU weight and deterioration count for just as much. */
+function priorityOf(f, muCut){
+  const thr = (CRITERIA.find(c => c.key === f.cat) || {t:10}).t;
+  let n = 0;
+  if(f.ccy[3] > thr) n++;                       // above its category threshold
+  if(f.ccy[2] >= muCut) n++;                    // among the heaviest MU losers
+  if(f.pctDec <= -2) n++;                       // worse than last year by 2 pp or more
+  return n >= 3 ? ["Critical","t-crit"] : n === 2 ? ["High","t-high"]
+       : n === 1 ? ["Medium","t-med"] : ["Low","t-low"];
+}
+/* A reading is implausible when no units were sent, when loss is negative
+   (sold exceeds sent) or when it reaches 100% (nothing billed at all). Left in,
+   these swamp the rankings and hide the feeders actually worth chasing. */
+const oddCY = f => !(f.ccy[0] > 0) || f.ccy[3] < 0 || f.ccy[3] >= 100;
+const oddPY = f => !(f.cpy[0] > 0) || f.cpy[3] < 0 || f.cpy[3] >= 100;
+
+function pctile(arr, q){
+  if(!arr.length) return Infinity;
+  const s = arr.slice().sort((a,b) => a-b);
+  return s[Math.min(s.length-1, Math.floor(s.length*q))];
+}
+function keyline(items){
+  const d = el("div","keyline");
+  items.forEach(([v,l]) => { const c = el("div");
+    c.appendChild(el("b",null,v)); c.appendChild(el("span",null,l)); d.appendChild(c); });
+  return d;
+}
+
+RENDER.summary = function(){
+  const b = bodyOf("summary"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"View"));
+  const vS = el("select"); SUM_VIEWS.forEach(([v,l]) => vS.appendChild(new Option(l,v)));
+  bar.appendChild(vS);
+  bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = el("select");
+  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
+  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Show")); const nS = el("select");
+  [10,20,50].forEach(n => nS.appendChild(new Option("Top "+n, n)));
+  nS.value = "20"; bar.appendChild(nS);
+  const okBox = el("input"); okBox.type = "checkbox"; okBox.id = "plaus"; okBox.checked = true;
+  const okLab = el("label"); okLab.htmlFor = "plaus";
+  okLab.style.display = "flex"; okLab.style.gap = "5px";
+  okLab.appendChild(okBox); okLab.appendChild(document.createTextNode("Ignore implausible readings"));
+  bar.appendChild(okLab);
+  const cnt = el("div","count"); bar.appendChild(cnt);
+  b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const scope = () => M.feeders.filter(f =>
+    (!dS.value || f.div === dS.value) && (!sS.value || f.sdn === sS.value) &&
+    (!cS.value || f.cat === cS.value));
+
+  /* ---------- view 1: three rankings of problem feeders ---------- */
+  function viewFeeders(){
+    const all = scope(), top = +nS.value, strict = okBox.checked;
+    const rows = strict ? all.filter(f => !oddCY(f)) : all;
+    const dropped = all.length - rows.length;
+    cnt.textContent = rows.length + " feeders ranked" + (dropped ? ", " + dropped + " set aside" : "");
+    const muCut = pctile(rows.filter(f => f.ccy[2] > 0).map(f => f.ccy[2]), 0.9);
+    host.appendChild(el("div","note",
+      "Three rankings, because one number never tells the whole story. A feeder at 50% loss "+
+      "on 0.02 MU matters less than one at 8% shedding 3 MU. Change is in percentage points and "+
+      "positive means worse. Priority counts three flags: above its category threshold, inside "+
+      "the heaviest 10% by MU, and 2 pp or more worse than last year \u2014 three flags is "+
+      "Critical, two High, one Medium."));
+    if(strict && dropped) host.appendChild(el("div","note",
+      dropped + " feeder" + (dropped>1?"s were":" was") + " left out: no units sent, a negative "+
+      "loss, or a full 100% loss. Those are metering or billing faults rather than rankable "+
+      "performance \u2014 untick the box above to see them."));
+
+    const cols = [{w:W.rank,type:"int",align:"center",g:0},
+      {w:W.div,type:"text",align:"left",g:0},{w:W.sdn,type:"text",align:"left",g:0},
+      {w:W.name,type:"text",align:"left",g:0},{w:W.cat,type:"text",align:"left",g:0},
+      {w:W.pct,type:"pct",align:"right",g:3,gs:true},{w:W.pct,type:"pct",align:"right",g:3},
+      {w:W.tail,type:"pct",align:"right",g:3},{w:W.mu,type:"mu",align:"right",g:3},
+      {w:W.pri,type:"text",align:"center",g:4,gs:true}];
+    const head = [[{t:"Rank",g:0},{t:"Division",g:0},{t:"Sub-Division",g:0},{t:"Feeder",g:0},
+      {t:"Cat",g:0},{t:"Loss % "+S.cy,g:3,gs:true},{t:"Loss % "+S.py,g:3},
+      {t:"Change (pp)",g:3},{t:"MU Loss",g:3},{t:"Priority",g:4,gs:true}]];
+
+    const build = (title, note, list) => {
+      host.appendChild(el("div","sec", title)).appendChild(el("span",null,note));
+      if(!list.length){ host.appendChild(el("div","empty","Nothing to rank here.")); return; }
+      const rs = list.slice(0, top).map((f,i) => {
+        const [pl,pc] = priorityOf(f, muCut);
+        return {cells:[{v:i+1,txt:String(i+1)},{v:f.div},{v:f.sdn},
+          {v:f.name, txt:f.name, click:() => openFeeder(f)},{v:f.cat},
+          {v:f.ccy[3]},{v:f.cpy[3]},
+          {v:-f.pctDec, cls: f.pctDec < 0 ? "neg" : "pos"},
+          {v:f.ccy[2]},{v:pl, txt:pl, cls:pc}]};
+      });
+      host.appendChild(renderVM({title:"Top "+top+" \u2014 "+title, cols, head, rows:rs}));
+    };
+    build("Highest % loss","worst cumulative loss percentage this year",
+      rows.filter(f => f.ccy[0] > 0).sort((a,z) => z.ccy[3]-a.ccy[3]));
+    build("Highest MU loss","most units actually lost, whatever the percentage",
+      rows.slice().sort((a,z) => z.ccy[2]-a.ccy[2]));
+    build("Biggest deterioration against last year","largest rise in loss percentage",
+      rows.filter(f => f.pctDec < 0 && (!strict || !oddPY(f))).sort((a,z) => a.pctDec-z.pctDec));
+  }
+
+  /* ---------- view 2: division and sub-division league tables ---------- */
+  function viewUnits(){
+    const rows = scope();
+    cnt.textContent = rows.length + " feeders in scope";
+    const groupBy = (keyf, list) => {
+      const m = {}; list.forEach(f => { const k = keyf(f); (m[k] = m[k] || []).push(f); });
+      return m;
+    };
+    const statusOf = a => a.pctDec < 0 ? ["Deteriorating","t-crit"]
+      : (a.shortfall !== null && a.shortfall > 0) ? ["Behind target","t-med"]
+      : ["On track","t-good"];
+
+    const table = (title, labelCols, entries) => {
+      const cols = [{w:W.rank,type:"int",align:"center",g:0}]
+        .concat(labelCols.map(c => ({w:c.w, type:"text", align:"left", g:0})))
+        .concat([{w:W.cnt,type:"int",align:"center",g:0},
+          {w:W.pct,type:"pct",align:"right",g:3,gs:true},{w:W.pct,type:"pct",align:"right",g:3},
+          {w:W.tail,type:"pct",align:"right",g:3},{w:W.mu,type:"mu",align:"right",g:3},
+          {w:W.tail,type:"mu",align:"right",g:4,gs:true},{w:W.tail,type:"mu",align:"right",g:4},
+          {w:W.stat,type:"text",align:"center",g:4}]);
+      const head = [[{t:"Rank",g:0}].concat(labelCols.map(c => ({t:c.h,g:0})))
+        .concat([{t:"Feeders",g:0},{t:"Loss % "+S.cy,g:3,gs:true},{t:"Loss % "+S.py,g:3},
+          {t:"YoY change (pp)",g:3},{t:"MU Loss",g:3},
+          {t:"Target MU",g:4,gs:true},{t:"Gap to target",g:4},{t:"Status",g:4}])];
+      const rs = entries.map((e,i) => {
+        const a = e.agg, [sl,sc] = statusOf(a);
+        return {cells:[{v:i+1,txt:String(i+1)}].concat(e.labels.map(v => ({v})))
+          .concat([{v:a.n,txt:String(a.n)},{v:a.ccy[3]},{v:a.cpy[3]},
+            {v:-a.pctDec, cls:a.pctDec < 0 ? "neg" : "pos"},{v:a.ccy[2]},
+            {v:a.target},{v:a.shortfall, cls:(a.shortfall !== null && a.shortfall > 0) ? "neg" : "pos"},
+            {v:sl, txt:sl, cls:sc}])};
+      });
+      host.appendChild(el("div","sec", title));
+      host.appendChild(renderVM({title, cols, head, rows:rs}));
+    };
+
+    const dv = Object.entries(groupBy(f => f.div, rows))
+      .map(([k,v]) => ({labels:[k], agg:aggregate(v,k)}))
+      .sort((a,z) => z.agg.ccy[3]-a.agg.ccy[3]);
+    const sd = Object.entries(groupBy(f => f.div+"\u0000"+f.sdn, rows))
+      .map(([k,v]) => ({labels:k.split("\u0000"), agg:aggregate(v,k.split("\u0000")[1])}))
+      .sort((a,z) => z.agg.ccy[3]-a.agg.ccy[3]);
+
+    if(sd.length){
+      const best = sd[sd.length-1], worst = sd[0];
+      const imp = sd.slice().sort((a,z) => z.agg.pctDec-a.agg.pctDec);
+      host.appendChild(keyline([
+        [worst.labels[1]+"  "+worst.agg.ccy[3].toFixed(2)+"%", "worst sub-division"],
+        [best.labels[1]+"  "+best.agg.ccy[3].toFixed(2)+"%", "best sub-division"],
+        [imp[0].labels[1]+"  \u2193"+Math.abs(imp[0].agg.pctDec).toFixed(2)+" pp", "biggest improvement"],
+        [imp[imp.length-1].labels[1]+"  \u2191"+Math.abs(imp[imp.length-1].agg.pctDec).toFixed(2)+" pp",
+         "biggest deterioration"]
+      ]));
+    }
+    host.appendChild(el("div","note",
+      "Ranked worst first on cumulative loss up to "+S.month+". Gap to target is the reduction "+
+      "still owed: positive means behind. Status is Deteriorating when loss is worse than last "+
+      "year, Behind target when it improved but not by enough, otherwise On track."));
+    table("Division performance", [{h:"Division", w:W.div}], dv);
+    table("Sub-division performance",
+      [{h:"Division", w:W.div},{h:"Sub-Division", w:W.sdn}], sd);
+  }
+
+  /* ---------- view 3: monthly heatmap ---------- */
+  function viewHeat(){
+    const rows = scope();
+    cnt.textContent = rows.length + " feeders in scope";
+    const lg = el("div","legend");
+    [["hm-na","no data or negative"],["hm0","under 5%"],["hm1","5\u201310%"],["hm2","10\u201320%"],
+     ["hm3","20\u201330%"],["hm4","30\u201340%"],["hm5","over 40%"]].forEach(([c,l]) => {
+      const s = el("span"), i = el("i");
+      i.style.background = "#"+TONE[c].bg.slice(2);
+      s.appendChild(i); s.appendChild(document.createTextNode(l)); lg.appendChild(s);
+    });
+    host.appendChild(el("div","note","Monthly loss percentage for "+S.cy+
+      " \u2014 each month on its own, not cumulative, so a month that slipped stands out. "+
+      "Grey means no reading yet, or a negative loss, which is a metering problem rather than a result."));
+    host.appendChild(lg);
+
+    const monthPctOf = (list,i) => {
+      let sent = 0, sold = 0, any = false;
+      list.forEach(f => { const a = num(f.raw[mCY(i)]), d = num(f.raw[mCY(i)+1]);
+        if(a !== null || d !== null) any = true;
+        sent += nz(f.raw[mCY(i)]); sold += nz(f.raw[mCY(i)+1]); });
+      if(!any || sent === 0) return null;
+      return pctOf(sent-sold, sent);
+    };
+    const heatTable = (title, labelCols, entries) => {
+      const cols = labelCols.map(c => ({w:c.w,type:"text",align:"left",g:0}))
+        .concat(MONTHS.map((m,i) => ({w:W.heat,type:"pct",align:"right",g:3,gs:i===0})));
+      const head = [labelCols.map(c => ({t:c.h,g:0}))
+        .concat(MONTHS.map((m,i) => ({t:m,g:3,gs:i===0})))];
+      const rs = entries.map(e => ({cells: e.labels.map(v => ({v}))
+        .concat(MONTHS.map((m,i) => { const v = monthPctOf(e.rows,i);
+          return {v, txt: v === null ? "\u2014" : v.toFixed(1), cls: heatCls(v)}; }))}));
+      host.appendChild(el("div","sec", title));
+      host.appendChild(renderVM({title, cols, head, rows:rs}));
+    };
+
+    const byDiv = {}, bySdn = {};
+    rows.forEach(f => { (byDiv[f.div] = byDiv[f.div] || []).push(f);
+      (bySdn[f.div+"\u0000"+f.sdn] = bySdn[f.div+"\u0000"+f.sdn] || []).push(f); });
+    heatTable("Division heatmap", [{h:"Division",w:W.div}],
+      Object.keys(byDiv).map(k => ({labels:[k], rows:byDiv[k]})));
+    heatTable("Sub-division heatmap", [{h:"Division",w:W.div},{h:"Sub-Division",w:W.sdn}],
+      Object.keys(bySdn).map(k => ({labels:k.split("\u0000"), rows:bySdn[k]})));
+  }
+
+  const draw = () => {
+    host.innerHTML = "";
+    nS.parentNode.style.display = "";
+    if(vS.value === "feeders") viewFeeders();
+    else if(vS.value === "units") viewUnits();
+    else viewHeat();
+  };
+  vS.onchange = draw; cS.onchange = draw; sS.onchange = draw; okBox.onchange = draw;
+  dS.onchange = () => { fillSub(sS, dS.value); draw(); };
+  nS.onchange = draw;
+  fillSub(sS,""); draw();
+};
+
+/* ---- Feeder loss summary: counts only ---- */
+RENDER.flsummary = function(){
+  const b = bodyOf("flsummary"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = el("select");
+  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
+  bar.appendChild(cS);
+  const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
+  b.appendChild(el("div","note","\u201cIncreased\u201d means the feeder's cumulative loss up to "+S.month+
+    " is worse than the same period of "+S.py+". Click a count to list those feeders."));
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = dS.value, s = sS.value, c = cS.value;
+    const scope = M.feeders.filter(f => (!d||f.div===d)&&(!s||f.sdn===s)&&(!c||f.cat===c));
+    const cats = c ? [c] : CATS;
+    const cols = [{w:W.cat,type:"text",align:"left"},{w:W.cnt,type:"int",align:"center"}]
+      .concat([0,0,0,0,0,0].map(() => ({w:W.cnt,type:"int",align:"center"})));
+    const head = [
+      [{t:"Category",rs:2},{t:"Total Feeders",rs:2},
+       {t:"% Loss against "+S.py,cs:3,g:1},{t:"Mus Loss against "+S.py,cs:3,g:1}],
+      [{t:"Increased",g:1},{t:"Decreased",g:1},{t:"No change",g:1},
+       {t:"Increased",g:1},{t:"Decreased",g:1},{t:"No change",g:1}]
+    ];
+    const where = (list,label) => list.length
+      ? {v:list.length, txt:String(list.length), cls:"cnt",
+         click:() => listFeeders(label, list.slice().sort((a,z)=>a.pctDec-z.pctDec))}
+      : {v:0, txt:"\u2014"};
+    const scopeName = (c2) => [d||"All divisions", s||null, c2].filter(Boolean).join(" \u00b7 ");
+    const rows = [];
+    const tot = [0,0,0,0,0,0,0];
+    cats.forEach(cat => {
+      const g = scope.filter(f => f.cat === cat);
+      const pu = g.filter(f=>f.pctDec<0), pd = g.filter(f=>f.pctDec>0), pn = g.filter(f=>f.pctDec===0);
+      const mu = g.filter(f=>f.muDec<0),  md = g.filter(f=>f.muDec>0),  mn = g.filter(f=>f.muDec===0);
+      [g,pu,pd,pn,mu,md,mn].forEach((l,i) => tot[i] += l.length);
+      rows.push({cells:[{v:cat},{v:g.length,txt:String(g.length)},
+        where(pu, scopeName(cat)+" \u00b7 % loss increased"),
+        where(pd, scopeName(cat)+" \u00b7 % loss decreased"),
+        where(pn, scopeName(cat)+" \u00b7 no change in % loss"),
+        where(mu, scopeName(cat)+" \u00b7 MU loss increased"),
+        where(md, scopeName(cat)+" \u00b7 MU loss decreased"),
+        where(mn, scopeName(cat)+" \u00b7 no change in MU loss")],
+        cls: pu.length > pd.length ? "hi" : "", flag: pu.length > pd.length ? "hi" : ""});
+    });
+    rows.push({cells:[{v:"Total"}].concat(tot.map(n=>({v:n,txt:String(n)}))), cls:"tot", tot:true});
+    cnt.textContent = scope.length+" feeders in scope";
+    host.innerHTML = "";
+    host.appendChild(renderVM({title:"Feeder loss summary", cols, head, rows}));
+  };
+  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
+  sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
+};
+
 /* ---- Loss Increased and High Loss Feeders share one builder ---- */
 function rankedTab(id, opts){
   const b = bodyOf(id); b.innerHTML = "";
@@ -769,8 +1480,9 @@ function rankedTab(id, opts){
   bar.appendChild(basis);
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
   bar.appendChild(el("label",null,"Category")); const cS = el("select");
+  const cats = opts.cats ? opts.cats() : CATS;
   cS.appendChild(new Option("All categories \u2014 grouped",""));
-  CATS.forEach(c => cS.appendChild(new Option(c,c)));
+  cats.forEach(c => cS.appendChild(new Option(c,c)));
   bar.appendChild(cS);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   const note = el("div","note"); b.appendChild(note);
@@ -785,10 +1497,10 @@ function rankedTab(id, opts){
       : "Worst first: the feeder whose "+(mode==="mu"?"MU loss":"% loss")+
         " rose the most sits at the top. Feeders that improved are left out of this view.";
     let base = M.feeders.filter(f => !d || f.div === d);
-    if(opts.highOnly) base = base.filter(f => /^y/i.test(f.high));
+    if(opts.highOnly) base = base.filter(isHigh);
     if(mode !== "all") base = base.filter(f => f[key] < 0);
     const sortKey = mode === "all" ? "pctDec" : key;
-    const groups = c ? [c] : CATS;
+    const groups = c ? [c] : cats;
     host.innerHTML = ""; let total = 0;
     groups.forEach(cat => {
       const rs = base.filter(f => f.cat === cat).sort((a,z) => a[sortKey]-z[sortKey]);
@@ -803,8 +1515,10 @@ function rankedTab(id, opts){
   };
   basis.onchange = draw; dS.onchange = draw; cS.onchange = draw; draw();
 }
+const isHigh = f => /^y/i.test(f.high);
 RENDER.lossup   = () => rankedTab("lossup",   {});
-RENDER.highloss = () => rankedTab("highloss", {highOnly:true, allowAll:true});
+RENDER.highloss = () => rankedTab("highloss", {highOnly:true, allowAll:true,
+  cats: () => CATS.filter(c => M.feeders.some(f => f.cat === c && isHigh(f)))});
 
 /* ---- Slab summary ---- */
 RENDER.slab = function(){
@@ -944,43 +1658,150 @@ RENDER.verify = function(){
     if($("#modal").classList.contains("on") && modalFeeder) openFeeder(modalFeeder); };
 };
 
+/* monthly series for any set of feeders.
+   mode 'sent' | 'sold' | 'loss'; stored=true reads the sheet's Loss MU column as-is. */
+function monthSeries(rows, mode, stored){
+  const pick = base => {
+    let any = false, sent = 0, sold = 0, stor = 0;
+    rows.forEach(f => {
+      const a = num(f.raw[base]), b = num(f.raw[base+1]), c = num(f.raw[base+2]);
+      if(a!==null||b!==null||c!==null) any = true;
+      sent += nz(f.raw[base]); sold += nz(f.raw[base+1]); stor += nz(f.raw[base+2]);
+    });
+    if(!any) return null;
+    return mode === "sent" ? sent : mode === "sold" ? sold
+         : mode === "pct"  ? (sent === 0 ? null : pctOf(sent-sold, sent))
+         : (stored ? stor : sent - sold);
+  };
+  const py = [], cy = [];
+  MONTHS.forEach((m,i) => { py.push(pick(mPY(i))); cy.push(pick(mCY(i))); });
+  return {py, cy};
+}
+function monthCompareVM(title, ser){
+  const cols = [{w:W.mon,type:"text",align:"left",g:0},
+    {w:W.cmu,type:"mu",align:"right",g:2,gs:true},
+    {w:W.cmu,type:"mu",align:"right",g:3,gs:true},
+    {w:W.cmu,type:"mu",align:"right",g:4,gs:true},
+    {w:W.cpct,type:"pct",align:"right",g:4}];
+  const head = [[{t:"Month",g:0},{t:S.py,g:2,gs:true},{t:S.cy,g:3,gs:true},
+                 {t:"Change",g:4,gs:true},{t:"% chg",g:4}]];
+  const rows = []; let sp = 0, sc = 0;
+  MONTHS.forEach((mn,i) => {
+    const p = ser.py[i], c = ser.cy[i];
+    if(i <= S.mi){ if(p!==null) sp += p; if(c!==null) sc += c; }
+    const diff = (p!==null&&c!==null) ? c-p : null;
+    const pc = (p!==null&&c!==null&&Math.abs(p)>1e-9) ? (c-p)/Math.abs(p)*100 : null;
+    const hot = pc!==null && Math.abs(pc) > 5;
+    rows.push({cells:[{v:mn},{v:p},{v:c},{v:diff},{v:pc, cls:pc===null?"":(pc<0?"neg":"pos")}],
+               cls:(i > S.mi ? "fut " : "")+(hot?"hi":""), flag:hot?"hi":""});
+  });
+  const df = sc-sp, pv = Math.abs(sp)>1e-9 ? (sc-sp)/Math.abs(sp)*100 : null;
+  rows.push({cells:[{v:"Total up to "+S.month},{v:sp},{v:sc},{v:df},{v:pv}], cls:"tot", tot:true});
+  return {title, cols, head, rows};
+}
+const METRICS = [["Sent out unit verification","sent"],
+                 ["Sold out unit verification","sold"],
+                 ["MU loss verification","loss"]];
+
 /* the three monthly tables plus the cumulative row, as nodes */
 function feederBlocks(f){
   const out = [];
   out.push(el("div","sec","Cumulative position"));
-  const vm0 = lossVM("Cumulative position",
-    [{h:"Fdr_code",w:W.fdr},{h:"Feeder Name",w:W.name},{h:"Category",w:W.cat},{h:"High Loss Selected",w:W.high}],
-    [{rec:f, labels:[f.fdr, f.name, f.cat, f.high]}]);
-  out.push(renderVM(vm0));
-
-  const scale = S.rawLoss ? 1 : 0.1;
-  [["Sent out unit verification",0,1],["Sold out unit verification",1,1],["MU loss verification",2,scale]]
-  .forEach(([title,off,k]) => {
-    const h = el("div","sec",title);
-    if(off===2 && !S.rawLoss) h.appendChild(el("span",null,
-      "shown as sent minus sold; the sheet stores this column at ten times that value"));
-    out.push(h);
-    const cols = [{w:W.cat,type:"text",align:"left"},{w:W.mu,type:"mu",align:"right"},
-      {w:W.mu,type:"mu",align:"right"},{w:W.mu,type:"mu",align:"right"},{w:W.pct,type:"pct",align:"right"}];
-    const head = [[{t:"Month"},{t:"As per "+S.py,g:1},{t:"As per "+S.cy,g:1},{t:"Change",g:1},{t:"% change",g:1}]];
-    const rows = []; let sp = 0, sc = 0;
-    MONTHS.forEach((mn,i) => {
-      const pv = num(f.raw[mPY(i)+off]), cv = num(f.raw[mCY(i)+off]);
-      const p = pv===null?null:pv*k, c = cv===null?null:cv*k;
-      if(p!==null) sp += p; if(c!==null) sc += c;
-      const diff = (p!==null&&c!==null) ? c-p : null;
-      const pc = (p!==null&&c!==null&&Math.abs(p)>1e-9) ? (c-p)/Math.abs(p)*100 : null;
-      rows.push({cells:[{v:mn},{v:p},{v:c},{v:diff},{v:pc, cls:pc===null?"":(pc<0?"neg":"pos")}],
-                 cls:(pc!==null&&Math.abs(pc)>5)?"f-yoy":"", flag:(pc!==null&&Math.abs(pc)>5)?"f-yoy":""});
-    });
-    const dp = sc-sp, pv2 = Math.abs(sp)>1e-9 ? (sc-sp)/Math.abs(sp)*100 : null;
-    rows.push({cells:[{v:"Total"},{v:sp},{v:sc},{v:dp},{v:pv2}], cls:"tot", tot:true});
-    out.push(renderVM({title:title+" \u2014 "+f.name, cols, head, rows}));
+  out.push(renderVM(lossVM("Cumulative position",
+    [{h:"Fdr_code",w:W.fdr},{h:"Feeder Name",w:W.name},{h:"Category",w:W.cat},
+     {h:"High Loss Selected",w:W.high}],
+    [{rec:f, labels:[f.fdr, f.name, f.cat, f.high]}])));
+  const trio = el("div","trio");
+  METRICS.forEach(([title,mode]) => {
+    const cell = el("div");
+    cell.appendChild(el("div","sec",title));
+    cell.appendChild(renderVM(monthCompareVM(f.name+" \u2014 "+title,
+      monthSeries([f], mode, mode==="loss" && S.rawLoss))));
+    trio.appendChild(cell);
   });
+  out.push(trio);
   out.push(el("div","note","Rows shaded amber move more than 5% between "+S.py+" and "+S.cy+
-    ". "+S.cy+" has no data after "+S.month+" yet."));
+    ". "+S.cy+" has no data after "+S.month+" yet."+
+    (S.rawLoss?"":" MU loss is shown as sent minus sold; the sheet stores that column at ten times the value.")));
   return out;
 }
+
+/* ---- Category wise monthly T&D verification ---- */
+RENDER.catverify = function(){
+  const b = bodyOf("catverify"); b.innerHTML = "";
+  const bar = el("div","filters");
+  bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = el("select");
+  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
+  bar.appendChild(cS);
+  const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
+  const host = el("div"); b.appendChild(host);
+
+  const draw = () => {
+    const d = dS.value, s = sS.value, c = cS.value;
+    const scope = M.feeders.filter(f => (!d||f.div===d)&&(!s||f.sdn===s)&&(!c||f.cat===c));
+    const name = [d||"Whole circle", s, c||"all categories"].filter(Boolean).join(" \u00b7 ");
+    cnt.textContent = scope.length+" feeders aggregated";
+    host.innerHTML = "";
+    if(!scope.length){ host.appendChild(el("div","empty","No feeder matches this combination.")); return; }
+
+    host.appendChild(el("div","note","Monthly totals across "+scope.length+
+      " feeders in "+name+". MU loss is sent minus sold."));
+    const trio = el("div","trio");
+    METRICS.forEach(([title,mode]) => {
+      const cell = el("div");
+      cell.appendChild(el("div","sec", title));
+      cell.appendChild(renderVM(monthCompareVM(name+" \u2014 "+title, monthSeries(scope, mode, false))));
+      trio.appendChild(cell);
+    });
+    host.appendChild(trio);
+
+    /* with no category picked, break the same totals down sub-division wise */
+    if(!c){
+      const h = el("div","sec","Sub-division wise totals");
+      h.appendChild(el("span",null,"all categories, cumulative up to "+S.month));
+      host.appendChild(h);
+      host.appendChild(legend());
+      const cols = [{w:W.div,type:"text",align:"left"},{w:W.sdn,type:"text",align:"left"},
+        {w:W.cnt,type:"int",align:"center"}]
+        .concat([0,0,0,0,0,0,0,0,0].map((_,i) => ({w:i%3===2?W.pct:W.mu,
+          type:i%3===2?"pct":"mu", align:"right"})));
+      const head = [
+        [{t:"Division",rs:2},{t:"Sub-Division",rs:2},{t:"Feeders",rs:2},
+         {t:"Sent out MU",cs:3,g:1},{t:"Sold out MU",cs:3,g:1},{t:"Mus Loss",cs:3,g:1}],
+        [].concat.apply([], [0,1,2].map(() =>
+          [{t:S.py,g:1},{t:S.cy,g:1},{t:"% change",g:1}]))
+      ];
+      const rows = []; const tot = [0,0,0,0,0,0,0];
+      const scopeSdn = [];
+      S.divisions.filter(x => !d || x === d).forEach(div =>
+        (S.subdivs[div]||[]).filter(x => !s || x === s).forEach(sd => scopeSdn.push([div,sd])));
+      scopeSdn.forEach(([div,sd]) => {
+        const g = scope.filter(f => f.div===div && f.sdn===sd);
+        if(!g.length) return;
+        const a = aggregate(g, sd);
+        const trio = [[a.cpy[0],a.ccy[0]],[a.cpy[1],a.ccy[1]],[a.cpy[2],a.ccy[2]]];
+        const cells = [{v:div},{v:sd},{v:g.length,txt:String(g.length)}];
+        trio.forEach(([p,q]) => { cells.push({v:p}); cells.push({v:q});
+          const pc = Math.abs(p)>1e-9 ? (q-p)/Math.abs(p)*100 : null;
+          cells.push({v:pc, cls:pc===null?"":(pc<0?"neg":"pos")}); });
+        tot[0] += g.length;
+        [0,1,2].forEach(i => { tot[1+i*2] += trio[i][0]; tot[2+i*2] += trio[i][1]; });
+        const worse = a.pctDec < 0;
+        rows.push({cells, cls: a.cls, flag: a.cls});
+      });
+      const tc = [{v:"Circle total"},{v:""},{v:tot[0],txt:String(tot[0])}];
+      [0,1,2].forEach(i => { const p = tot[1+i*2], q = tot[2+i*2];
+        tc.push({v:p}); tc.push({v:q});
+        tc.push({v: Math.abs(p)>1e-9 ? (q-p)/Math.abs(p)*100 : null}); });
+      rows.push({cells:tc, cls:"tot", tot:true});
+      host.appendChild(renderVM({title:name+" \u2014 sub-division wise totals", cols, head, rows}));
+    }
+  };
+  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
+  sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
+};
 
 /* ---- feeder modal ---- */
 let modalFeeder = null, modalVMs = [], modalName = "";
@@ -995,6 +1816,48 @@ function openFeeder(f){
 }
 function closeModal(){ $("#modal").classList.remove("on"); document.body.style.overflow = ""; modalFeeder = null; }
 
+/* Header cells wrap, so each header row's height varies. Recompute the sticky
+   offsets from the rendered heights instead of assuming a fixed row height. */
+function syncSticky(){
+  document.querySelectorAll(".tblwrap thead").forEach(th => {
+    let top = 0;
+    for(let i=0;i<th.rows.length;i++){
+      const h = th.rows[i].getBoundingClientRect().height;
+      if(!h) return;                                    // panel hidden; retry later
+      for(const c of th.rows[i].cells) c.style.top = top+"px";
+      top += h;
+    }
+  });
+}
+let stickyTimer = null;
+function queueSticky(){ clearTimeout(stickyTimer); stickyTimer = setTimeout(syncSticky, 30); }
+if(window.MutationObserver){
+  const mo = new MutationObserver(queueSticky);
+  mo.observe($("#panels"), {childList:true, subtree:true});
+  mo.observe($("#modalBody"), {childList:true, subtree:true});
+}
+window.addEventListener("resize", queueSticky);
+
+/* ---------------- collapsible side rail ---------------- */
+const RAIL_BREAK = 900;
+const narrow = () => window.innerWidth <= RAIL_BREAK;
+function setRail(open){
+  document.body.classList.toggle("railoff", !open);
+  queueSticky();                       /* table viewport width changed */
+}
+let wasNarrow = narrow();
+setRail(!wasNarrow);                   /* open on desktop, closed on a small screen */
+$("#railToggle").onclick = () => setRail(document.body.classList.contains("railoff"));
+$("#scrim").onclick = () => setRail(false);
+window.addEventListener("resize", () => {
+  const n = narrow();
+  if(n !== wasNarrow){ wasNarrow = n; setRail(!n); }   /* only on crossing the breakpoint */
+});
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape" && !$("#modal").classList.contains("on") &&
+     narrow() && !document.body.classList.contains("railoff")) setRail(false);
+});
+
 /* ================================================================
    6.  EXPORTS
    ================================================================ */
@@ -1002,41 +1865,81 @@ const safe = s => s.replace(/[^A-Za-z0-9 _-]/g,"").replace(/\s+/g," ").trim().sl
 const stamp = () => new Date().toISOString().slice(0,10);
 const subtitle = () => "Baroda O&M Circle  \u00b7  T&D month "+S.month+"  \u00b7  "+S.py+" vs "+S.cy+
                        "  \u00b7  generated "+stamp();
-function vmsIn(id){ return Array.from(bodyOf(id).querySelectorAll(".tblwrap")).map(n => n._vm).filter(Boolean); }
+function vmsIn(id){
+  if(!S.rendered[id]){ RENDER[id](); S.rendered[id] = true; }   /* export a tab never opened */
+  return Array.from(bodyOf(id).querySelectorAll(".tblwrap")).map(n => n._vm).filter(Boolean);
+}
+/* The export libraries come from a CDN. On a restricted network one can fail to
+   load, which would otherwise make the buttons do nothing at all. */
+function haveLib(kind){
+  if(kind === "xlsx" && typeof XLSX === "undefined"){
+    alert("The Excel export library did not load.\n\nThis is usually a blocked CDN on the office "+
+          "network. Try again on a connection that allows cdn.jsdelivr.net or unpkg.com, or ask for "+
+          "the offline build with the libraries bundled in."); return false; }
+  if(kind === "pdf" && !(window.jspdf && window.jspdf.jsPDF)){
+    alert("The PDF export library did not load.\n\nThis is usually a blocked CDN on the office "+
+          "network. Try again on a connection that allows cdnjs.cloudflare.com, or ask for the "+
+          "offline build with the libraries bundled in."); return false; }
+  return true;
+}
+/* Run an export behind a busy overlay and surface anything that goes wrong. */
+function runExport(label, fn){
+  const b = $("#busy");
+  b.textContent = label; b.style.display = "flex";
+  setTimeout(() => {
+    try { fn(); }
+    catch(err){ console.error(err); alert("The export failed.\n\n"+(err && err.message ? err.message : err)); }
+    finally { b.style.display = "none"; }
+  }, 40);
+}
 
 function addSheets(wb, vms, prefix){
   vms.forEach((vm,i) => {
     let nm = safe(vms.length > 1 ? prefix.slice(0,12)+" "+vm.title.split("\u2014").pop() : prefix);
-    if(vms.length > 1) nm = safe(nm)+"_"+(i+1);
-    while(wb.SheetNames.includes(nm)) nm = safe(nm).slice(0,26)+"_"+(wb.SheetNames.length+1);
+    if(vms.length > 1) nm = (nm+"_"+(i+1)).slice(0,31);
+    let k = 2;
+    while(wb.SheetNames.includes(nm)){ nm = (nm.slice(0,28)+"~"+k).slice(0,31); k++; }
     XLSX.utils.book_append_sheet(wb, vmToSheet(vm), nm);
   });
 }
 function exportTabExcel(id){
+  if(!haveLib("xlsx")) return;
   const vms = vmsIn(id);
   if(!vms.length) return alert("There is nothing to export on this tab yet.");
-  const wb = XLSX.utils.book_new(); addSheets(wb, vms, tabOf(id).nav);
-  XLSX.writeFile(wb, "TD Loss "+safe(tabOf(id).nav)+" "+S.month+" "+stamp()+".xlsx");
+  runExport("Building the Excel file\u2026", () => {
+    const wb = XLSX.utils.book_new(); addSheets(wb, vms, tabOf(id).nav);
+    XLSX.writeFile(wb, "TD Loss "+safe(tabOf(id).nav)+" "+S.month+" "+stamp()+".xlsx");
+  });
 }
 function exportAllExcel(){
-  renderAll();
-  const wb = XLSX.utils.book_new();
-  TABS.forEach(t => addSheets(wb, vmsIn(t.id), tabOf(t.id).nav));
-  if(!wb.SheetNames.length) return alert("Load a workbook first.");
-  XLSX.writeFile(wb, "TD Loss Analysis BOMC "+S.month+" "+stamp()+".xlsx");
+  if(!haveLib("xlsx")) return;
+  runExport("Building the workbook, this can take a moment\u2026", () => {
+    renderAll();
+    const wb = XLSX.utils.book_new();
+    TABS.forEach(t => addSheets(wb, vmsIn(t.id), tabOf(t.id).nav));
+    if(!wb.SheetNames.length) throw new Error("No sheets were produced. Load a workbook first.");
+    XLSX.writeFile(wb, "TD Loss Analysis BOMC "+S.month+" "+stamp()+".xlsx");
+  });
 }
 function exportTabPdf(id){
+  if(!haveLib("pdf")) return;
   const vms = vmsIn(id);
   if(!vms.length) return alert("There is nothing to export on this tab yet.");
-  const doc = newPdf(); let first = true;
-  vms.forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); });
-  doc.save("TD Loss "+safe(tabOf(id).nav)+" "+S.month+" "+stamp()+".pdf");
+  const big = vms.reduce((a,v) => a+v.rows.length, 0);
+  runExport("Building the PDF"+(big>400?", this can take a minute\u2026":"\u2026"), () => {
+    const doc = newPdf(); let first = true;
+    vms.forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); });
+    doc.save("TD Loss "+safe(tabOf(id).nav)+" "+S.month+" "+stamp()+".pdf");
+  });
 }
 function exportAllPdf(){
-  renderAll();
-  const doc = newPdf(); let first = true;
-  TABS.forEach(t => vmsIn(t.id).forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); }));
-  doc.save("TD Loss Analysis BOMC "+S.month+" "+stamp()+".pdf");
+  if(!haveLib("pdf")) return;
+  runExport("Building the full PDF, this can take a minute\u2026", () => {
+    renderAll();
+    const doc = newPdf(); let first = true;
+    TABS.forEach(t => vmsIn(t.id).forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); }));
+    doc.save("TD Loss Analysis BOMC "+S.month+" "+stamp()+".pdf");
+  });
 }
 function printAll(){
   renderAll(); document.body.classList.add("printall");
@@ -1044,12 +1947,15 @@ function printAll(){
   window.addEventListener("afterprint",done);
   setTimeout(() => window.print(), 120);
 }
-$("#mXls").onclick = () => { const wb = XLSX.utils.book_new();
-  addSheets(wb, modalVMs, safe(modalName));
-  XLSX.writeFile(wb, safe(modalName)+" "+S.month+" "+stamp()+".xlsx"); };
-$("#mPdf").onclick = () => { const doc = newPdf(); let first = true;
-  modalVMs.forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); });
-  doc.save(safe(modalName)+" "+S.month+" "+stamp()+".pdf"); };
+$("#mXls").onclick = () => { if(!haveLib("xlsx")) return;
+  runExport("Building the Excel file\u2026", () => {
+    const wb = XLSX.utils.book_new(); addSheets(wb, modalVMs, safe(modalName));
+    XLSX.writeFile(wb, safe(modalName)+" "+S.month+" "+stamp()+".xlsx"); }); };
+$("#mPdf").onclick = () => { if(!haveLib("pdf")) return;
+  runExport("Building the PDF\u2026", () => {
+    const doc = newPdf(); let first = true;
+    modalVMs.forEach(vm => { first = pdfVM(doc, vm, first, subtitle()); });
+    doc.save(safe(modalName)+" "+S.month+" "+stamp()+".pdf"); }); };
 $("#mClose").onclick = closeModal;
 $("#modal").onclick = e => { if(e.target.id === "modal") closeModal(); };
 document.addEventListener("keydown", e => { if(e.key === "Escape") closeModal(); });
@@ -1069,7 +1975,8 @@ function handleFile(file){
       ms.onchange = () => { S.month = ms.value; S.mi = MONTHS.indexOf(S.month);
                             rebuild(); showTab(S.active); };
       buildNav(); buildPanels(); rebuild(); showTab("circle");
-    }catch(err){ alert("Could not read that workbook.\n\n"+err.message); }
+      $("#pickBtn").textContent = "Change workbook";
+    }catch(err){ console.error(err); alert("Could not read that workbook.\n\n"+err.message); }
   };
   fr.readAsArrayBuffer(file);
 }
