@@ -274,7 +274,7 @@ const mCY = m => 29 + 8*m;               // Apr current year  = AD, +8 per month
 
 const MONTHS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
 const CATS   = ["EHT","HTEX","INDU","JGY","URBAN","GIDC","AG","AGSKY","SST"];
-const ROLLUP = ["With AG","Without AG"];
+const ROLLUP = ["With AG","Without AG","Without AG & EHT"];
 const CRITERIA = [{key:"INDU",label:"IND",t:5},{key:"GIDC",label:"GIDC",t:2},
                   {key:"JGY",label:"JGY",t:25},{key:"URBAN",label:"URBAN",t:10},
                   {key:"AG",label:"AG",t:25}];
@@ -309,7 +309,7 @@ const heatCls = v => v === null ? "hm-na" : v < 0 ? "hm-na"
 /* ---------------- column widths, in px; one source of truth -------- */
 const W = {div:96, sdcd:82, sdn:114, fdr:84, name:206, cat:74, high:80,
            mu:78, pct:72, tail:100, band:118, names:260, cnt:88,
-           mon:48, cmu:64, cpct:58, rank:52, stat:112, pri:92, heat:56};
+           mon:48, cmu:64, cpct:58, rank:52, stat:112, pri:92, heat:56, catx:140};
 
 const S = { raw:[], month:"Jun", mi:2, py:"2025-26", cy:"2026-27",
             divisions:[], subdivs:{}, sdnCode:{}, rawLoss:false, rendered:{}, active:"circle" };
@@ -409,10 +409,14 @@ function aggregate(rows, label){
   Object.assign(o, flagsFor(cpy, ccy));
   return o;
 }
+const EX_AG  = f => f.cat !== "AG" && f.cat !== "AGSKY";
+const EX_EHT = f => EX_AG(f) && f.cat !== "EHT";
 function catSets(rows){
+  const inCat = f => CATS.includes(f.cat);
   const out = CATS.map(c => ({ cat:c, rows:rows.filter(f=>f.cat===c) }));
-  out.push({ cat:"With AG",    rows:rows.filter(f=>CATS.includes(f.cat)) });
-  out.push({ cat:"Without AG", rows:rows.filter(f=>CATS.includes(f.cat)&&f.cat!=="AG"&&f.cat!=="AGSKY") });
+  out.push({ cat:"With AG",          rows:rows.filter(inCat) });
+  out.push({ cat:"Without AG",       rows:rows.filter(f=>inCat(f)&&EX_AG(f)) });
+  out.push({ cat:"Without AG & EHT", rows:rows.filter(f=>inCat(f)&&EX_EHT(f)) });
   return out;
 }
 function buildModel(){
@@ -751,9 +755,9 @@ const RENDER = {};
 
 RENDER.circle = function(){
   const b = bodyOf("circle"); b.innerHTML = "";
-  const wo = M.circle.find(r => r.label === "Without AG"),
-        wi = M.circle.find(r => r.label === "With AG");
-  if(wo || wi){
+  const pick = l => M.circle.find(r => r.label === l);
+  const wo = pick("Without AG"), wi = pick("With AG"), we = pick("Without AG & EHT");
+  if(wo || wi || we){
     const hero = el("div","hero");
     const block = (rec, caption) => {
       if(!rec) return;
@@ -770,6 +774,7 @@ RENDER.circle = function(){
       hero.appendChild(d);
     };
     block(wo, "Cumulative T&D loss \u2014 without AG");
+    block(we, "Cumulative T&D loss \u2014 without AG & EHT");
     block(wi, "Cumulative T&D loss \u2014 with AG");
     const meta = el("div","hmeta");
     meta.appendChild(el("div","v", S.cy));
@@ -780,7 +785,7 @@ RENDER.circle = function(){
   b.appendChild(el("div","note", M.feeders.length+" feeders \u00b7 "+M.sdnWise.length+
     " sub-divisions \u00b7 "+S.divisions.length+" divisions \u00b7 "+S.py+" vs "+S.cy+" up to "+S.month));
   b.appendChild(legend());
-  b.appendChild(renderVM(lossVM("Circle worksheet", [{h:"Category", w:W.band}],
+  b.appendChild(renderVM(lossVM("Circle worksheet", [{h:"Category", w:W.catx}],
     M.circle.map(r => ({rec:r, labels:[r.label], tot:isRollup(r.label)})))));
 };
 
@@ -795,7 +800,7 @@ RENDER.divcat = function(){
     const rs = M.divCat.filter(r => !d || r.div === d);
     cnt.textContent = rs.length+" rows"; host.innerHTML = "";
     host.appendChild(renderVM(lossVM("Division \u00d7 category",
-      [{h:"Division",w:W.div},{h:"Category",w:W.cat}],
+      [{h:"Division",w:W.div},{h:"Category",w:W.catx}],
       rs.map(r => ({rec:r, labels:[r.div,r.label], tot:isRollup(r.label)})))));
   };
   sel.onchange = draw; draw();
@@ -841,7 +846,7 @@ RENDER.sdncat = function(){
     const rs = M.sdnCat.filter(r => (!d||r.div===d)&&(!s||r.sdn===s)&&(!c||r.label===c));
     cnt.textContent = rs.length+" rows"; host.innerHTML = "";
     host.appendChild(renderVM(lossVM("Sub-division \u00d7 category",
-      [{h:"Division",w:W.div},{h:"Sdn Code",w:W.sdcd},{h:"Sub-Division",w:W.sdn},{h:"Category",w:W.cat}],
+      [{h:"Division",w:W.div},{h:"Sdn Code",w:W.sdcd},{h:"Sub-Division",w:W.sdn},{h:"Category",w:W.catx}],
       rs.map(r => ({rec:r, labels:[r.div,r.sdcd,r.sdn,r.label], tot:isRollup(r.label)})))));
   };
   dS.onchange = () => { fillSub(sS,dS.value); draw(); };
@@ -1413,6 +1418,16 @@ RENDER.summary = function(){
 };
 
 /* ---- Feeder loss summary: counts only ---- */
+/* Where a feeder's loss figure started and finished. Only three of the four
+   sign moves are reachable for a feeder whose loss rose, since positive to
+   negative would mean the loss fell. */
+const TRANS = [["Negative \u2192 Negative", f => f.cpy[3] < 0 && f.ccy[3] < 0],
+               ["Negative \u2192 Positive", f => f.cpy[3] < 0 && f.ccy[3] >= 0],
+               ["Positive \u2192 Positive", f => f.cpy[3] >= 0 && f.ccy[3] >= 0]];
+/* size of the rise, in percentage points */
+const RISE = [["0 \u2013 3", 0, 3],["3 \u2013 5", 3, 5],["5 \u2013 10", 5, 10],
+              ["10 \u2013 20", 10, 20],["over 20", 20, Infinity]];
+
 RENDER.flsummary = function(){
   const b = bodyOf("flsummary"); b.innerHTML = "";
   const bar = el("div","filters");
@@ -1462,7 +1477,60 @@ RENDER.flsummary = function(){
     rows.push({cells:[{v:"Total"}].concat(tot.map(n=>({v:n,txt:String(n)}))), cls:"tot", tot:true});
     cnt.textContent = scope.length+" feeders in scope";
     host.innerHTML = "";
+    host.appendChild(el("div","sec","Feeders gaining and losing ground"));
     host.appendChild(renderVM({title:"Feeder loss summary", cols, head, rows}));
+
+    /* ---- how the sign of the loss moved, for feeders that went backwards ---- */
+    const up = scope.filter(f => f.pctDec < 0);
+    host.appendChild(el("div","sec","Loss increase by sign of the movement"))
+      .appendChild(el("span",null,"only the "+up.length+" feeders whose % loss rose"));
+    host.appendChild(el("div","note",
+      "Where a feeder started and finished. A negative loss means more units were billed than "+
+      "sent, which is a metering or booking fault rather than a result, so anything still "+
+      "negative on the right needs the meter checked before the loss figure means much. "+
+      "Positive to negative cannot appear here: that would be a fall, not a rise."));
+    const tCols = [{w:W.cat,type:"text",align:"left",g:0},{w:W.cnt,type:"int",align:"center",g:0}]
+      .concat(TRANS.map((t,i) => ({w:W.tail,type:"int",align:"center",g:3,gs:i===0})));
+    const tHead = [[{t:"Category",rs:2,g:0},{t:"Loss increased",rs:2,g:0},
+        {t:"Movement of the loss figure, "+S.py+" \u2192 "+S.cy, cs:TRANS.length, g:3, gs:true}],
+      TRANS.map((t,i) => ({t:t[0], g:3, gs:i===0}))];
+    const tRows = []; const tTot = TRANS.map(()=>0); let tN = 0;
+    cats.forEach(cat => {
+      const g = up.filter(f => f.cat === cat);
+      tN += g.length;
+      const cells = [{v:cat},{v:g.length,txt:String(g.length)}];
+      TRANS.forEach((t,i) => { const l = g.filter(t[1]); tTot[i] += l.length;
+        cells.push(where(l, scopeName(cat)+" \u00b7 "+t[0])); });
+      tRows.push({cells});
+    });
+    tRows.push({cells:[{v:"Total"},{v:tN,txt:String(tN)}]
+      .concat(tTot.map(n=>({v:n,txt:String(n)}))), cls:"tot", tot:true});
+    host.appendChild(renderVM({title:"Loss increase by sign of the movement", cols:tCols,
+      head:tHead, rows:tRows}));
+
+    /* ---- how large the increase was ---- */
+    host.appendChild(el("div","sec","Loss increase by size of the rise"))
+      .appendChild(el("span",null,"percentage points added since "+S.py));
+    const rCols = [{w:W.cat,type:"text",align:"left",g:0},{w:W.cnt,type:"int",align:"center",g:0}]
+      .concat(RISE.map((r,i) => ({w:W.cnt,type:"int",align:"center",g:3,gs:i===0})));
+    const rHead = [[{t:"Category",rs:2,g:0},{t:"Loss increased",rs:2,g:0},
+        {t:"Rise in % loss", cs:RISE.length, g:3, gs:true}],
+      RISE.map((r,i) => ({t:r[0], g:3, gs:i===0}))];
+    const rRows = []; const rTot = RISE.map(()=>0);
+    cats.forEach(cat => {
+      const g = up.filter(f => f.cat === cat);
+      const cells = [{v:cat},{v:g.length,txt:String(g.length)}];
+      RISE.forEach((r,i) => {
+        const l = g.filter(f => -f.pctDec >= r[1] && -f.pctDec < r[2]);
+        rTot[i] += l.length;
+        cells.push(where(l, scopeName(cat)+" \u00b7 rise of "+r[0]));
+      });
+      rRows.push({cells});
+    });
+    rRows.push({cells:[{v:"Total"},{v:tN,txt:String(tN)}]
+      .concat(rTot.map(n=>({v:n,txt:String(n)}))), cls:"tot", tot:true});
+    host.appendChild(renderVM({title:"Loss increase by size of the rise", cols:rCols,
+      head:rHead, rows:rRows}));
   };
   dS.onchange = () => { fillSub(sS,dS.value); draw(); };
   sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
@@ -1489,6 +1557,33 @@ function rankedTab(id, opts){
   b.appendChild(legend());
   const host = el("div"); b.appendChild(host);
 
+  const summaryTable = base => {
+    const gs = cats.filter(c => base.some(f => f.cat === c));
+    const cols = [{w:W.cat,type:"text",align:"left",g:0},{w:W.cnt,type:"int",align:"center",g:0}]
+      .concat([0,0,0,0].map((x,i) => ({w:W.tail,type:"int",align:"center",g:3,gs:i===0})));
+    const head = [[{t:"Category",rs:2,g:0},{t:"Flagged feeders",rs:2,g:0},
+        {t:"% Loss against "+S.py, cs:2, g:3, gs:true},
+        {t:"Mus Loss against "+S.py, cs:2, g:3}],
+      [{t:"Increased",g:3,gs:true},{t:"Decreased",g:3},
+       {t:"Increased",g:3},{t:"Decreased",g:3}]];
+    const hit = (l,lab) => l.length
+      ? {v:l.length, txt:String(l.length), cls:"cnt",
+         click:() => listFeeders(lab, l.slice().sort((a,z)=>a.pctDec-z.pctDec))}
+      : {v:0, txt:"\u2014"};
+    const tot = [0,0,0,0,0];
+    const rows = gs.map(cat => {
+      const g = base.filter(f => f.cat === cat);
+      const l = [g.filter(f=>f.pctDec<0), g.filter(f=>f.pctDec>0),
+                 g.filter(f=>f.muDec<0),  g.filter(f=>f.muDec>0)];
+      tot[0] += g.length; l.forEach((x,i) => tot[i+1] += x.length);
+      return {cells:[{v:cat},{v:g.length,txt:String(g.length)}]
+        .concat(l.map((x,i) => hit(x, "High loss \u00b7 "+cat+" \u00b7 "+
+          (i<2?"% loss ":"MU loss ")+(i%2?"decreased":"increased"))))};
+    });
+    rows.push({cells:[{v:"Total"}].concat(tot.map(n=>({v:n,txt:String(n)}))), cls:"tot", tot:true});
+    return {title:"High loss feeders \u2014 summary", cols, head, rows};
+  };
+
   const draw = () => {
     const mode = basis.value, d = dS.value, c = cS.value;
     const key = mode === "mu" ? "muDec" : "pctDec";
@@ -1501,7 +1596,15 @@ function rankedTab(id, opts){
     if(mode !== "all") base = base.filter(f => f[key] < 0);
     const sortKey = mode === "all" ? "pctDec" : key;
     const groups = c ? [c] : cats;
-    host.innerHTML = ""; let total = 0;
+    host.innerHTML = "";
+    if(opts.summary){
+      const flagged = M.feeders.filter(f => (!d || f.div === d) && isHigh(f));
+      host.appendChild(el("div","sec","Summary of selected high loss feeders"))
+        .appendChild(el("span",null, flagged.length+" flagged"+(d?" in "+d+" division":" in the circle")));
+      host.appendChild(renderVM(summaryTable(flagged)));
+      host.appendChild(el("div","sec","Feeder detail"));
+    }
+    let total = 0;
     groups.forEach(cat => {
       const rs = base.filter(f => f.cat === cat).sort((a,z) => a[sortKey]-z[sortKey]);
       total += rs.length;
@@ -1517,31 +1620,44 @@ function rankedTab(id, opts){
 }
 const isHigh = f => /^y/i.test(f.high);
 RENDER.lossup   = () => rankedTab("lossup",   {});
-RENDER.highloss = () => rankedTab("highloss", {highOnly:true, allowAll:true,
+RENDER.highloss = () => rankedTab("highloss", {highOnly:true, allowAll:true, summary:true,
   cats: () => CATS.filter(c => M.feeders.some(f => f.cat === c && isHigh(f)))});
 
 /* ---- Slab summary ---- */
 RENDER.slab = function(){
   const b = bodyOf("slab"); b.innerHTML = "";
   b.appendChild(el("div","note","Each sub-division is placed by its cumulative "+S.cy+
-    " % loss up to "+S.month+". Sub-divisions running a negative loss fall in the first band."));
+    " % loss up to "+S.month+". Sub-divisions running a negative loss fall in the first band. "+
+    "Click any number to see which sub-divisions sit in that band."));
+  b.appendChild(el("div","sec","Sub-divisions by loss band"));
 
-  const cols = [{w:W.div,type:"text",align:"left"}]
-    .concat(SLABS.map(() => ({w:W.names,type:"text",align:"left"})));
-  const head = [[{t:"% loss wise breakup of number of sub-divisions", cs:1+SLABS.length}],
-                [{t:"Division"}].concat(SLABS.map(s => ({t:s.label, g:1})))];
+  const cols = [{w:W.div,type:"text",align:"left",g:0}]
+    .concat(SLABS.map((s,i) => ({w:W.cnt,type:"int",align:"center",g:3,gs:i===0})))
+    .concat([{w:W.cnt,type:"int",align:"center",g:4,gs:true}]);
+  const head = [[{t:"% loss wise breakup of number of sub-divisions", cs:2+SLABS.length, g:0}],
+                [{t:"Division",g:0}].concat(SLABS.map((s,i) => ({t:s.label, g:3, gs:i===0})))
+                  .concat([{t:"Total", g:4, gs:true}])];
   const rows = [];
   const totals = SLABS.map(()=>0);
+  const cell = (hit, label) => hit.length
+    ? {v:hit.length, txt:String(hit.length), cls:"cnt", click:() => listSubdivs(label, hit)}
+    : {v:0, txt:"\u2014"};
   S.divisions.forEach(d => {
-    const cells = [{v:d}];
+    const cells = [{v:d}]; let n = 0;
     SLABS.forEach((s,i) => {
       const hit = M.sdnWise.filter(r => r.div===d && s.test(r.ccy[3]));
-      totals[i] += hit.length;
-      cells.push({v: hit.length ? hit.map(r => r.label+" ("+r.ccy[3].toFixed(2)+")").join(", ") : "\u2014"});
+      totals[i] += hit.length; n += hit.length;
+      cells.push(cell(hit, d+" division \u00b7 "+s.label));
     });
+    cells.push({v:n, txt:String(n)});
     rows.push({cells});
   });
-  rows.push({cells:[{v:"Circle total"}].concat(totals.map(n=>({v:String(n)}))), cls:"tot", tot:true});
+  const tcells = [{v:"Circle total"}];
+  SLABS.forEach(s => tcells.push(cell(M.sdnWise.filter(r => s.test(r.ccy[3])),
+    "Whole circle \u00b7 "+s.label)));
+  const grand = totals.reduce((a,x)=>a+x,0);
+  tcells.push({v:grand, txt:String(grand)});
+  rows.push({cells:tcells, cls:"tot", tot:true});
   b.appendChild(renderVM({title:"Sub-divisions by loss slab", cols, head, rows}));
 
   b.appendChild(el("div","sec","Sub-division figures behind the bands"));
@@ -1613,14 +1729,32 @@ RENDER.stat = function(){
   dS.onchange = draw; draw();
 };
 
-function listFeeders(title, list){
-  $("#modalTitle").textContent = title+"  \u00b7  "+list.length+" feeder"+(list.length>1?"s":"");
+function openList(title, vm, withLegend){
+  $("#modalTitle").textContent = title;
   const body = $("#modalBody"); body.innerHTML = "";
-  modalVMs = [lossVM(title, FEEDER_LABELS, list.map(feederRec))];
-  modalName = title;
-  body.appendChild(legend());
-  body.appendChild(renderVM(modalVMs[0]));
+  modalVMs = [vm]; modalName = title; modalFeeder = null;
+  if(withLegend) body.appendChild(legend());
+  body.appendChild(renderVM(vm));
   $("#modal").classList.add("on"); document.body.style.overflow = "hidden";
+}
+function listFeeders(title, list){
+  openList(title+"  \u00b7  "+list.length+" feeder"+(list.length>1?"s":""),
+           lossVM(title, FEEDER_LABELS, list.map(feederRec)), true);
+}
+/* sub-divisions behind a slab count */
+function listSubdivs(title, list){
+  const cols = [{w:W.div,type:"text",align:"left",g:0},{w:W.sdcd,type:"text",align:"left",g:0},
+    {w:W.sdn,type:"text",align:"left",g:0},{w:W.pct,type:"pct",align:"right",g:3,gs:true},
+    {w:W.pct,type:"pct",align:"right",g:3},{w:W.tail,type:"pct",align:"right",g:3},
+    {w:W.tail,type:"mu",align:"right",g:3}];
+  const head = [[{t:"Division",g:0},{t:"Sdn Code",g:0},{t:"Sub-Division",g:0},
+    {t:"Cum % loss "+S.cy,g:3,gs:true},{t:"Cum % loss "+S.py,g:3},
+    {t:"% Loss Decreased",g:3},{t:"Mus Loss Decreased",g:3}]];
+  const rows = list.map(r => ({cells:[{v:r.div},{v:r.sdcd},{v:r.label},{v:r.ccy[3]},{v:r.cpy[3]},
+    {v:r.pctDec, cls:r.pctDec<0?"neg":"pos"},{v:r.muDec, cls:r.muDec<0?"neg":"pos"}],
+    cls:r.cls, flag:r.cls}));
+  openList(title+"  \u00b7  "+list.length+" sub-division"+(list.length>1?"s":""),
+           {title, cols, head, rows}, true);
 }
 
 /* ---- Monthly T&D verification ---- */
