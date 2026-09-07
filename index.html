@@ -484,7 +484,36 @@ const fmtV = (v,t) => { const n = num(v);
   if(n===null) return "";
   return t==="mu" ? n.toFixed(3) : t==="pct" ? n.toFixed(2) : String(n); };
 
+/* Click a header to sort. Trailing total rows stay pinned at the bottom, and
+   blanks sink whichever way the sort runs. */
+function sortVM(vm, ci, dir){
+  let pin = [], body = vm.rows.slice();
+  while(body.length && body[body.length-1].tot) pin.unshift(body.pop());
+  const type = (vm.cols[ci] || {}).type;
+  const raw = r => { const c = r.cells[ci] || {}; return c.txt !== undefined && type === "text" ? c.txt : c.v; };
+  body.sort((a,z) => {
+    const x = raw(a), y = raw(z);
+    if(type && type !== "text"){
+      const nx = num(x), ny = num(y);
+      if(nx === null && ny === null) return 0;
+      if(nx === null) return 1;
+      if(ny === null) return -1;
+      return dir * (nx - ny);
+    }
+    return dir * String(x === null || x === undefined ? "" : x)
+      .localeCompare(String(y === null || y === undefined ? "" : y), undefined, {numeric:true});
+  });
+  vm.rows = body.concat(pin);
+  vm.sort = {ci, dir};
+}
 function renderVM(vm){
+  const wrap = el("div","tblwrap");
+  wrap._vm = vm;
+  const paint = () => { wrap.innerHTML = ""; wrap.appendChild(buildTable(vm, paint)); queueSticky(); };
+  paint();
+  return wrap;
+}
+function buildTable(vm, paint){
   const t = el("table");
   t.style.width = vm.cols.reduce((a,c)=>a+c.w,0) + "px";
   const cg = el("colgroup");
@@ -492,11 +521,35 @@ function renderVM(vm){
   t.appendChild(cg);
 
   const th = el("thead");
-  vm.head.forEach(hr => { const tr = el("tr");
-    hr.forEach(h => { const c = el("th", (h.g?"h"+h.g:"")+(h.gs?" gs":""), h.t);
-      if(h.cs) c.colSpan = h.cs; if(h.rs) c.rowSpan = h.rs;
-      c.title = h.t; tr.appendChild(c); });
-    th.appendChild(tr); });
+  const taken = {};
+  vm.head.forEach((hr,ri) => {
+    const tr = el("tr");
+    let ci = 0;
+    hr.forEach(hc => {
+      while(taken[ri+"_"+ci]) ci++;
+      const cs = hc.cs || 1, rs = hc.rs || 1;
+      const c = el("th", (hc.g?"h"+hc.g:"")+(hc.gs?" gs":""), hc.t);
+      if(hc.cs) c.colSpan = hc.cs;
+      if(hc.rs) c.rowSpan = hc.rs;
+      c.title = hc.t;
+      if(cs === 1 && vm.sortable !== false && vm.rows.length > 1){
+        const col = ci;
+        c.classList.add("srt");
+        if(vm.sort && vm.sort.ci === col){
+          const ind = el("span","ind", vm.sort.dir > 0 ? "\u25b2" : "\u25bc");
+          c.appendChild(ind);
+        }
+        c.onclick = () => {
+          const dir = (vm.sort && vm.sort.ci === col && vm.sort.dir > 0) ? -1 : 1;
+          sortVM(vm, col, dir); paint();
+        };
+      }
+      for(let a=0;a<rs;a++) for(let b=0;b<cs;b++) taken[(ri+a)+"_"+(ci+b)] = true;
+      ci += cs;
+      tr.appendChild(c);
+    });
+    th.appendChild(tr);
+  });
   t.appendChild(th);
 
   const tb = el("tbody");
@@ -515,9 +568,7 @@ function renderVM(vm){
     tb.appendChild(tr);
   });
   t.appendChild(tb);
-  const w = el("div","tblwrap"); w.appendChild(t);
-  w._vm = vm;
-  return w;
+  return t;
 }
 
 /* ---------------- Excel renderer ---------------- */
@@ -742,11 +793,73 @@ function legend(){
   });
   return d;
 }
-function divSelect(){ const s = el("select"); s.appendChild(new Option("All divisions",""));
-  S.divisions.forEach(d => s.appendChild(new Option(d,d))); return s; }
-function fillSub(sel,div){ sel.innerHTML = ""; sel.appendChild(new Option("All sub-divisions",""));
-  (div ? (S.subdivs[div]||[]) : S.divisions.reduce((a,d)=>a.concat(S.subdivs[d]||[]),[]))
-    .forEach(s => sel.appendChild(new Option(s,s))); }
+/* ---------------- multi-select filter ----------------
+   Nothing selected means everything, which keeps the default view unchanged
+   and saves a click in the common case. */
+function closePicks(except){
+  document.querySelectorAll(".mpick.open").forEach(p => { if(p !== except) p.classList.remove("open"); });
+}
+document.addEventListener("click", () => closePicks(null));
+
+function multiPick(allLabel, options){
+  const wrap = el("span","mpick"), btn = el("button","mbtn"), panel = el("div","mpanel");
+  let opts = [], sel = [], handler = null;
+  const fire = () => { if(handler) handler(); };
+  const paint = () => {
+    btn.textContent = (!sel.length || sel.length === opts.length) ? allLabel
+      : sel.length === 1 ? sel[0] : sel.length + " selected";
+    btn.classList.toggle("act", sel.length > 0 && sel.length < opts.length);
+    btn.title = sel.length ? sel.join(", ") : allLabel;
+  };
+  function build(list){
+    opts = (list || []).slice();
+    sel = sel.filter(v => opts.includes(v));
+    panel.innerHTML = "";
+    const act = el("div","mact");
+    const all = el("button",null,"Select all"), clr = el("button",null,"Clear");
+    all.onclick = e => { e.stopPropagation(); sel = opts.slice(); build(opts); fire(); };
+    clr.onclick = e => { e.stopPropagation(); sel = []; build(opts); fire(); };
+    act.append(all, clr); panel.appendChild(act);
+    opts.forEach(v => {
+      const l = el("label"), cb = el("input");
+      cb.type = "checkbox"; cb.checked = sel.includes(v);
+      cb.onclick = e => e.stopPropagation();
+      cb.onchange = () => { sel = cb.checked ? sel.concat([v]) : sel.filter(x => x !== v);
+        paint(); fire(); };
+      l.onclick = e => e.stopPropagation();
+      l.append(cb, document.createTextNode(v)); panel.appendChild(l);
+    });
+    paint();
+  }
+  btn.onclick = e => { e.preventDefault(); e.stopPropagation();
+    const open = wrap.classList.contains("open"); closePicks(wrap);
+    wrap.classList.toggle("open", !open); };
+  wrap.append(btn, panel);
+  wrap.vals = () => sel.slice();
+  wrap.set = build;
+  Object.defineProperty(wrap, "value", {get: () => sel.length === 1 ? sel[0] : ""});
+  Object.defineProperty(wrap, "onchange", {get: () => handler, set: fn => { handler = fn; }});
+  build(options);
+  return wrap;
+}
+/* a readable name for whatever is selected, used in titles and notes */
+function pickLabel(pick, allText){
+  const a = pick.vals();
+  if(!a.length) return allText;
+  if(a.length <= 2) return a.join(" + ");
+  return a.length+" "+allText.replace(/^All\s+/,"");
+}
+/* an empty selection means no restriction */
+const inSel = (pick, v) => { const a = pick.vals(); return !a.length || a.includes(v); };
+const selDivs = pick => S.divisions.filter(d => inSel(pick, d));
+
+function divSelect(){ return multiPick("All divisions", S.divisions); }
+function catSelect(list){ return multiPick("All categories", list || CATS); }
+function subSelect(){ return multiPick("All sub-divisions", []); }
+function fillSub(sel, divPick){
+  const ds = divPick ? selDivs(divPick) : S.divisions;
+  sel.set(ds.reduce((a,d) => a.concat(S.subdivs[d] || []), []));
+}
 
 /* ================================================================
    5.  RENDERERS
@@ -796,8 +909,8 @@ RENDER.divcat = function(){
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   b.appendChild(legend());
   const host = el("div"); b.appendChild(host);
-  const draw = () => { const d = sel.value;
-    const rs = M.divCat.filter(r => !d || r.div === d);
+  const draw = () => {
+    const rs = M.divCat.filter(r => inSel(sel, r.div));
     cnt.textContent = rs.length+" rows"; host.innerHTML = "";
     host.appendChild(renderVM(lossVM("Division \u00d7 category",
       [{h:"Division",w:W.div},{h:"Category",w:W.catx}],
@@ -818,8 +931,8 @@ RENDER.sdnwise = function(){
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   b.appendChild(legend());
   const host = el("div"); b.appendChild(host);
-  const draw = () => { const d = sel.value;
-    let rs = M.sdnWise.filter(r => !d || r.div === d);
+  const draw = () => {
+    let rs = M.sdnWise.filter(r => inSel(sel, r.div));
     if(sort.value === "loss") rs = rs.slice().sort((a,c) => c.ccy[3]-a.ccy[3]);
     if(sort.value === "dec")  rs = rs.slice().sort((a,c) => a.pctDec-c.pctDec);
     cnt.textContent = rs.length+" sub-divisions"; host.innerHTML = "";
@@ -834,23 +947,20 @@ RENDER.sdncat = function(){
   const b = bodyOf("sdncat"); b.innerHTML = "";
   const bar = el("div","filters");
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories",""));
-  CATS.concat(ROLLUP).forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = catSelect(CATS.concat(ROLLUP)); bar.appendChild(cS);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   b.appendChild(legend());
   const host = el("div"); b.appendChild(host);
-  const draw = () => { const d = dS.value, s = sS.value, c = cS.value;
-    const rs = M.sdnCat.filter(r => (!d||r.div===d)&&(!s||r.sdn===s)&&(!c||r.label===c));
+  const draw = () => {
+    const rs = M.sdnCat.filter(r => inSel(dS,r.div) && inSel(sS,r.sdn) && inSel(cS,r.label));
     cnt.textContent = rs.length+" rows"; host.innerHTML = "";
     host.appendChild(renderVM(lossVM("Sub-division \u00d7 category",
       [{h:"Division",w:W.div},{h:"Sdn Code",w:W.sdcd},{h:"Sub-Division",w:W.sdn},{h:"Category",w:W.catx}],
       rs.map(r => ({rec:r, labels:[r.div,r.sdcd,r.sdn,r.label], tot:isRollup(r.label)})))));
   };
-  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
-  sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
+  dS.onchange = () => { fillSub(sS,dS); draw(); };
+  sS.onchange = draw; cS.onchange = draw; fillSub(sS,null); draw();
 };
 
 const FEEDER_LABELS = [{h:"Division Name",w:W.div},{h:"Sdn Code",w:W.sdcd},{h:"Sub-Divn",w:W.sdn},
@@ -862,22 +972,20 @@ RENDER.feeders = function(){
   const b = bodyOf("feeders"); b.innerHTML = "";
   const bar = el("div","filters");
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = catSelect(); bar.appendChild(cS);
   const q = el("input"); q.type = "search"; q.placeholder = "Feeder name or code"; bar.appendChild(q);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   b.appendChild(legend());
   const host = el("div"); b.appendChild(host);
-  const draw = () => { const d = dS.value, s = sS.value, c = cS.value, k = q.value.trim().toLowerCase();
-    const rs = M.feeders.filter(f => (!d||f.div===d)&&(!s||f.sdn===s)&&(!c||f.cat===c)&&
+  const draw = () => { const k = q.value.trim().toLowerCase();
+    const rs = M.feeders.filter(f => inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat) &&
       (!k||f.name.toLowerCase().includes(k)||f.fdr.toLowerCase().includes(k)));
     cnt.textContent = rs.length+" of "+M.feeders.length+" feeders"; host.innerHTML = "";
     host.appendChild(renderVM(lossVM("Feeders worksheet", FEEDER_LABELS, rs.map(feederRec))));
   };
-  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
-  sS.onchange = draw; cS.onchange = draw; q.oninput = draw; fillSub(sS,""); draw();
+  dS.onchange = () => { fillSub(sS,dS); draw(); };
+  sS.onchange = draw; cS.onchange = draw; q.oninput = draw; fillSub(sS,null); draw();
 };
 
 
@@ -1007,12 +1115,10 @@ RENDER.trends = function(){
   dWrap.appendChild(el("label",null,"Division")); const dS = divSelect(); dWrap.appendChild(dS);
   bar.appendChild(dWrap);
   const sWrap = el("span"); sWrap.style.display = "contents";
-  sWrap.appendChild(el("label",null,"Sub-division")); const sS = el("select"); sWrap.appendChild(sS);
+  sWrap.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); sWrap.appendChild(sS);
   bar.appendChild(sWrap);
   const cWrap = el("span"); cWrap.style.display = "contents";
-  cWrap.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
-  cWrap.appendChild(cS); bar.appendChild(cWrap);
+  cWrap.appendChild(el("label",null,"Category")); const cS = catSelect(); cWrap.appendChild(cS); bar.appendChild(cWrap);
   const q = el("input"); q.type = "search"; q.placeholder = "Feeder name or code";
   q.style.minWidth = "240px"; q.style.display = "none"; bar.appendChild(q);
   bar.appendChild(el("label",null,"Chart"));
@@ -1025,8 +1131,7 @@ RENDER.trends = function(){
   const host = el("div"); b.appendChild(host);
 
   const scope = () => M.feeders.filter(f =>
-    (!dS.value || f.div === dS.value) && (!sS.value || f.sdn === sS.value) &&
-    (!cS.value || f.cat === cS.value));
+    inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat));
 
   /* which metrics to draw: the chosen one, or all four */
   const picked = () => mS.value ? TREND_METRICS.filter(m => m[0] === mS.value) : TREND_METRICS;
@@ -1041,7 +1146,8 @@ RENDER.trends = function(){
   function viewCircle(){
     const rows = scope();
     cnt.textContent = rows.length+" feeders";
-    const name = [dS.value||"Whole circle", sS.value, cS.value].filter(Boolean).join(" \u00b7 ");
+    const name = [pickLabel(dS,"Whole circle"), pickLabel(sS,""), pickLabel(cS,"")]
+      .filter(Boolean).join(" \u00b7 ");
     host.appendChild(el("div","note",
       "Each month on its own, April to March, this year against last. "+
       S.cy+" stops after "+S.month+" because that is as far as the data goes."));
@@ -1057,7 +1163,7 @@ RENDER.trends = function(){
   function viewDiv(){
     const rows = scope();
     cnt.textContent = rows.length+" feeders";
-    const divs = S.divisions.filter(d => !dS.value || d === dS.value);
+    const divs = selDivs(dS);
     const one = single();
     host.appendChild(el("div","note",
       "All divisions on one axis first, then each division against its own last year."+multiNote()));
@@ -1098,8 +1204,8 @@ RENDER.trends = function(){
       return;
     }
     const pairs = [];
-    S.divisions.filter(d => !dS.value || d === dS.value).forEach(d =>
-      (S.subdivs[d]||[]).forEach(s => pairs.push([d,s])));
+    selDivs(dS).forEach(d =>
+      (S.subdivs[d]||[]).filter(s => inSel(sS,s)).forEach(s => pairs.push([d,s])));
     const one = single();
     host.appendChild(el("div","note",
       "Every sub-division in scope, "+S.cy+" against "+S.py+
@@ -1178,8 +1284,8 @@ RENDER.trends = function(){
     else viewFeeder();
   }
   lS.onchange = draw; cS.onchange = draw; sS.onchange = draw; mS.onchange = draw;
-  dS.onchange = () => { fillSub(sS, dS.value); draw(); };
-  fillSub(sS,""); draw();
+  dS.onchange = () => { fillSub(sS, dS); draw(); };
+  fillSub(sS,null); draw();
 };
 
 /* ================================================================
@@ -1227,10 +1333,8 @@ RENDER.summary = function(){
   const vS = el("select"); SUM_VIEWS.forEach(([v,l]) => vS.appendChild(new Option(l,v)));
   bar.appendChild(vS);
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = catSelect(); bar.appendChild(cS);
   bar.appendChild(el("label",null,"Show")); const nS = el("select");
   [10,20,50].forEach(n => nS.appendChild(new Option("Top "+n, n)));
   nS.value = "20"; bar.appendChild(nS);
@@ -1244,8 +1348,7 @@ RENDER.summary = function(){
   const host = el("div"); b.appendChild(host);
 
   const scope = () => M.feeders.filter(f =>
-    (!dS.value || f.div === dS.value) && (!sS.value || f.sdn === sS.value) &&
-    (!cS.value || f.cat === cS.value));
+    inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat));
 
   /* ---------- view 1: three rankings of problem feeders ---------- */
   function viewFeeders(){
@@ -1412,9 +1515,9 @@ RENDER.summary = function(){
     else viewHeat();
   };
   vS.onchange = draw; cS.onchange = draw; sS.onchange = draw; okBox.onchange = draw;
-  dS.onchange = () => { fillSub(sS, dS.value); draw(); };
+  dS.onchange = () => { fillSub(sS, dS); draw(); };
   nS.onchange = draw;
-  fillSub(sS,""); draw();
+  fillSub(sS,null); draw();
 };
 
 /* ---- Feeder loss summary: counts only ---- */
@@ -1432,19 +1535,16 @@ RENDER.flsummary = function(){
   const b = bodyOf("flsummary"); b.innerHTML = "";
   const bar = el("div","filters");
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = catSelect(); bar.appendChild(cS);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   b.appendChild(el("div","note","\u201cIncreased\u201d means the feeder's cumulative loss up to "+S.month+
     " is worse than the same period of "+S.py+". Click a count to list those feeders."));
   const host = el("div"); b.appendChild(host);
 
   const draw = () => {
-    const d = dS.value, s = sS.value, c = cS.value;
-    const scope = M.feeders.filter(f => (!d||f.div===d)&&(!s||f.sdn===s)&&(!c||f.cat===c));
-    const cats = c ? [c] : CATS;
+    const scope = M.feeders.filter(f => inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat));
+    const cats = cS.vals().length ? cS.vals() : CATS;
     const cols = [{w:W.cat,type:"text",align:"left"},{w:W.cnt,type:"int",align:"center"}]
       .concat([0,0,0,0,0,0].map(() => ({w:W.cnt,type:"int",align:"center"})));
     const head = [
@@ -1457,7 +1557,8 @@ RENDER.flsummary = function(){
       ? {v:list.length, txt:String(list.length), cls:"cnt",
          click:() => listFeeders(label, list.slice().sort((a,z)=>a.pctDec-z.pctDec))}
       : {v:0, txt:"\u2014"};
-    const scopeName = (c2) => [d||"All divisions", s||null, c2].filter(Boolean).join(" \u00b7 ");
+    const scopeName = c2 => [pickLabel(dS,"All divisions"), pickLabel(sS,""), c2]
+      .filter(Boolean).join(" \u00b7 ");
     const rows = [];
     const tot = [0,0,0,0,0,0,0];
     cats.forEach(cat => {
@@ -1532,8 +1633,8 @@ RENDER.flsummary = function(){
     host.appendChild(renderVM({title:"Loss increase by size of the rise", cols:rCols,
       head:rHead, rows:rRows}));
   };
-  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
-  sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
+  dS.onchange = () => { fillSub(sS,dS); draw(); };
+  sS.onchange = draw; cS.onchange = draw; fillSub(sS,null); draw();
 };
 
 /* ---- Loss Increased and High Loss Feeders share one builder ---- */
@@ -1547,11 +1648,8 @@ function rankedTab(id, opts){
   basis.appendChild(new Option("MU Loss Increased","mu"));
   bar.appendChild(basis);
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  const cats = opts.cats ? opts.cats() : CATS;
-  cS.appendChild(new Option("All categories \u2014 grouped",""));
-  cats.forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Category"));  const cats = opts.cats ? opts.cats() : CATS;
+ const cS = catSelect(cats); bar.appendChild(cS);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   const note = el("div","note"); b.appendChild(note);
   b.appendChild(legend());
@@ -1585,22 +1683,23 @@ function rankedTab(id, opts){
   };
 
   const draw = () => {
-    const mode = basis.value, d = dS.value, c = cS.value;
+    const mode = basis.value;
     const key = mode === "mu" ? "muDec" : "pctDec";
     note.textContent = mode === "all"
       ? "All flagged feeders, ranked by % loss increase. Rows shaded amber went backwards against last year."
       : "Worst first: the feeder whose "+(mode==="mu"?"MU loss":"% loss")+
         " rose the most sits at the top. Feeders that improved are left out of this view.";
-    let base = M.feeders.filter(f => !d || f.div === d);
+    let base = M.feeders.filter(f => inSel(dS, f.div));
     if(opts.highOnly) base = base.filter(isHigh);
     if(mode !== "all") base = base.filter(f => f[key] < 0);
     const sortKey = mode === "all" ? "pctDec" : key;
-    const groups = c ? [c] : cats;
+    const groups = cS.vals().length ? cS.vals() : cats;
     host.innerHTML = "";
     if(opts.summary){
-      const flagged = M.feeders.filter(f => (!d || f.div === d) && isHigh(f));
+      const flagged = M.feeders.filter(f => inSel(dS, f.div) && isHigh(f));
       host.appendChild(el("div","sec","Summary of selected high loss feeders"))
-        .appendChild(el("span",null, flagged.length+" flagged"+(d?" in "+d+" division":" in the circle")));
+        .appendChild(el("span",null, flagged.length+" flagged in "+
+          pickLabel(dS,"the circle")));
       host.appendChild(renderVM(summaryTable(flagged)));
       host.appendChild(el("div","sec","Feeder detail"));
     }
@@ -1688,7 +1787,6 @@ RENDER.stat = function(){
   const host = el("div"); b.appendChild(host);
 
   const draw = () => {
-    const d = dS.value;
     const cols = [{w:W.div,type:"text",align:"left"},{w:W.sdn,type:"text",align:"left"}]
       .concat(CRITERIA.map(() => ({w:W.cnt,type:"int",align:"center"})))
       .concat([{w:W.cnt,type:"int",align:"center"}]);
@@ -1697,7 +1795,7 @@ RENDER.stat = function(){
         .concat(CRITERIA.map(c=>({t:c.label,g:1}))).concat([{t:"Total",rs:2,g:1}]),
       CRITERIA.map(c=>({t:"> "+c.t+"%",g:1}))];
     const rows = []; const colTot = CRITERIA.map(()=>0); let grand = 0;
-    S.divisions.filter(x => !d || x === d).forEach(div => {
+    selDivs(dS).forEach(div => {
       (S.subdivs[div]||[]).forEach(sd => {
         const lists = CRITERIA.map(c => M.feeders.filter(f =>
           f.div===div && f.sdn===sd && f.cat===c.key && f.ccy[3] > c.t)
@@ -1865,17 +1963,15 @@ RENDER.catverify = function(){
   const b = bodyOf("catverify"); b.innerHTML = "";
   const bar = el("div","filters");
   bar.appendChild(el("label",null,"Division")); const dS = divSelect(); bar.appendChild(dS);
-  bar.appendChild(el("label",null,"Sub-division")); const sS = el("select"); bar.appendChild(sS);
-  bar.appendChild(el("label",null,"Category")); const cS = el("select");
-  cS.appendChild(new Option("All categories","")); CATS.forEach(c => cS.appendChild(new Option(c,c)));
-  bar.appendChild(cS);
+  bar.appendChild(el("label",null,"Sub-division")); const sS = subSelect(); bar.appendChild(sS);
+  bar.appendChild(el("label",null,"Category")); const cS = catSelect(); bar.appendChild(cS);
   const cnt = el("div","count"); bar.appendChild(cnt); b.appendChild(bar);
   const host = el("div"); b.appendChild(host);
 
   const draw = () => {
-    const d = dS.value, s = sS.value, c = cS.value;
-    const scope = M.feeders.filter(f => (!d||f.div===d)&&(!s||f.sdn===s)&&(!c||f.cat===c));
-    const name = [d||"Whole circle", s, c||"all categories"].filter(Boolean).join(" \u00b7 ");
+    const scope = M.feeders.filter(f => inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat));
+    const name = [pickLabel(dS,"Whole circle"), pickLabel(sS,""),
+      pickLabel(cS,"all categories")].filter(Boolean).join(" \u00b7 ");
     cnt.textContent = scope.length+" feeders aggregated";
     host.innerHTML = "";
     if(!scope.length){ host.appendChild(el("div","empty","No feeder matches this combination.")); return; }
@@ -1891,8 +1987,8 @@ RENDER.catverify = function(){
     });
     host.appendChild(trio);
 
-    /* with no category picked, break the same totals down sub-division wise */
-    if(!c){
+    /* with no single category picked, break the same totals down sub-division wise */
+    if(cS.vals().length !== 1){
       const h = el("div","sec","Sub-division wise totals");
       h.appendChild(el("span",null,"all categories, cumulative up to "+S.month));
       host.appendChild(h);
@@ -1909,8 +2005,8 @@ RENDER.catverify = function(){
       ];
       const rows = []; const tot = [0,0,0,0,0,0,0];
       const scopeSdn = [];
-      S.divisions.filter(x => !d || x === d).forEach(div =>
-        (S.subdivs[div]||[]).filter(x => !s || x === s).forEach(sd => scopeSdn.push([div,sd])));
+      selDivs(dS).forEach(div =>
+        (S.subdivs[div]||[]).filter(x => inSel(sS,x)).forEach(sd => scopeSdn.push([div,sd])));
       scopeSdn.forEach(([div,sd]) => {
         const g = scope.filter(f => f.div===div && f.sdn===sd);
         if(!g.length) return;
@@ -1933,8 +2029,8 @@ RENDER.catverify = function(){
       host.appendChild(renderVM({title:name+" \u2014 sub-division wise totals", cols, head, rows}));
     }
   };
-  dS.onchange = () => { fillSub(sS,dS.value); draw(); };
-  sS.onchange = draw; cS.onchange = draw; fillSub(sS,""); draw();
+  dS.onchange = () => { fillSub(sS,dS); draw(); };
+  sS.onchange = draw; cS.onchange = draw; fillSub(sS,null); draw();
 };
 
 /* ---- feeder modal ---- */
