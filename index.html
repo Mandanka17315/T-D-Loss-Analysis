@@ -146,6 +146,40 @@ tbody tr:hover td[class*="hm"],tbody tr:hover td[class*="t-"]{filter:brightness(
 .card svg text{font-family:inherit}
 @media print{.charts{grid-template-columns:1fr 1fr}
   .card{break-inside:avoid;page-break-inside:avoid}}
+/* multi-select filter, modelled on the Excel column filter menu */
+.mpick{position:relative;display:inline-block}
+.mbtn{font:inherit;background:var(--surface);border:1px solid var(--line);border-radius:5px;
+  padding:6px 26px 6px 9px;min-width:152px;max-width:250px;text-align:left;color:var(--ink);
+  position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbtn:after{content:"";position:absolute;right:9px;top:50%;margin-top:-2px;
+  border:4px solid transparent;border-top-color:var(--ink-2)}
+.mbtn:hover{border-color:var(--accent)}
+.mbtn.act{border-color:var(--accent);color:var(--accent);font-weight:500}
+.mbtn.act:after{border-top-color:var(--accent)}
+.mpanel{display:none;position:absolute;z-index:70;top:calc(100% + 4px);left:0;width:248px;
+  background:var(--surface);border:1px solid var(--line);border-radius:6px;
+  box-shadow:0 12px 30px rgba(16,32,42,.2);padding:8px}
+.mpick.open .mpanel{display:block}
+.msearch{width:100%;font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);
+  border-radius:4px;margin-bottom:6px;min-width:0}
+.mlist{max-height:232px;overflow:auto}
+.mpanel label{display:flex;gap:7px;align-items:center;padding:4px 7px;border-radius:4px;
+  font-size:13px;color:var(--ink);cursor:pointer;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.mpanel label:hover{background:var(--accent-soft)}
+.mpanel label.mall{font-weight:600;border-bottom:1px solid var(--line-2);
+  margin-bottom:4px;padding-bottom:6px;border-radius:0}
+.mnone{padding:9px 7px;font-size:12.5px;color:var(--ink-2)}
+.mfoot{display:flex;justify-content:space-between;align-items:center;gap:6px;
+  border-top:1px solid var(--line-2);margin-top:6px;padding-top:6px}
+.mfoot span{font-size:11.5px;color:var(--ink-2)}
+.mfoot button{font:inherit;font-size:12px;background:none;border:1px solid var(--line);
+  border-radius:4px;padding:3px 9px;color:var(--ink-2)}
+.mfoot button:hover{border-color:var(--accent);color:var(--accent)}
+/* sortable headers */
+thead th.srt{cursor:pointer;user-select:none}
+thead th.srt:hover{background:#2f4a5c}
+thead th .ind{opacity:.9;font-size:9px;margin-left:4px}
 .keyline{display:flex;gap:18px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);
   border-radius:6px;padding:11px 13px;margin-bottom:14px;font-size:12.5px}
 .keyline div{display:flex;flex-direction:column;gap:2px}
@@ -803,39 +837,79 @@ document.addEventListener("click", () => closePicks(null));
 
 function multiPick(allLabel, options){
   const wrap = el("span","mpick"), btn = el("button","mbtn"), panel = el("div","mpanel");
-  let opts = [], sel = [], handler = null;
-  const fire = () => { if(handler) handler(); };
-  const paint = () => {
-    btn.textContent = (!sel.length || sel.length === opts.length) ? allLabel
-      : sel.length === 1 ? sel[0] : sel.length + " selected";
-    btn.classList.toggle("act", sel.length > 0 && sel.length < opts.length);
-    btn.title = sel.length ? sel.join(", ") : allLabel;
-  };
-  function build(list){
-    opts = (list || []).slice();
-    sel = sel.filter(v => opts.includes(v));
-    panel.innerHTML = "";
-    const act = el("div","mact");
-    const all = el("button",null,"Select all"), clr = el("button",null,"Clear");
-    all.onclick = e => { e.stopPropagation(); sel = opts.slice(); build(opts); fire(); };
-    clr.onclick = e => { e.stopPropagation(); sel = []; build(opts); fire(); };
-    act.append(all, clr); panel.appendChild(act);
-    opts.forEach(v => {
-      const l = el("label"), cb = el("input");
-      cb.type = "checkbox"; cb.checked = sel.includes(v);
-      cb.onclick = e => e.stopPropagation();
-      cb.onchange = () => { sel = cb.checked ? sel.concat([v]) : sel.filter(x => x !== v);
-        paint(); fire(); };
-      l.onclick = e => e.stopPropagation();
-      l.append(cb, document.createTextNode(v)); panel.appendChild(l);
-    });
-    paint();
-  }
-  btn.onclick = e => { e.preventDefault(); e.stopPropagation();
-    const open = wrap.classList.contains("open"); closePicks(wrap);
-    wrap.classList.toggle("open", !open); };
+  const search = el("input","msearch"), list = el("div","mlist"), foot = el("div","mfoot");
+  const count = el("span"), clear = el("button",null,"Clear filter");
+  search.type = "search"; search.placeholder = "Search\u2026";
+  foot.append(count, clear);
+  panel.append(search, list, foot);
   wrap.append(btn, panel);
+
+  /* unset means no restriction, which is not the same as an empty selection:
+     unticking (Select all) leaves nothing chosen, exactly as Excel does. */
+  let opts = [], sel = [], unset = true, handler = null, filter = "";
+  const fire = () => { if(handler) handler(); };
+  const eff = () => unset ? opts.slice() : sel.slice();
+  const apply = next => {
+    if(next.length === opts.length){ unset = true; sel = []; }
+    else { unset = false; sel = opts.filter(v => next.includes(v)); }
+    paint(); paintList(); fire();
+  };
+
+  /* the filter line shows what is actually selected, not just how many */
+  const paint = () => {
+    btn.textContent = unset ? allLabel
+      : !sel.length ? "None selected"
+      : sel.join(", ").length <= 32 ? sel.join(", ")
+      : sel.slice(0,2).join(", ")+"  +"+(sel.length-2);
+    btn.classList.toggle("act", !unset);
+    btn.title = unset ? allLabel : (sel.join(", ") || "None selected");
+    count.textContent = unset ? opts.length+" of "+opts.length+" shown"
+                              : sel.length+" of "+opts.length+" selected";
+  };
+  const row = (text, checked, indet, onToggle, cls) => {
+    const l = el("label", cls || null), cb = el("input");
+    cb.type = "checkbox"; cb.checked = checked; cb.indeterminate = !!indet;
+    cb.onclick = e => e.stopPropagation();
+    cb.onchange = () => onToggle(cb.checked);
+    l.onclick = e => e.stopPropagation();
+    l.append(cb, document.createTextNode(text));
+    return l;
+  };
+  function paintList(){
+    list.innerHTML = "";
+    const shown = opts.filter(v => !filter || v.toLowerCase().includes(filter));
+    const on = eff();
+    const everyShown = shown.length > 0 && shown.every(v => on.includes(v));
+    const someShown  = shown.some(v => on.includes(v));
+    list.appendChild(row(filter ? "(Select all matching)" : "(Select all)",
+      everyShown, !everyShown && someShown,
+      checked => apply(checked ? Array.from(new Set(on.concat(shown)))
+                               : on.filter(v => !shown.includes(v))), "mall"));
+    if(!shown.length){ list.appendChild(el("div","mnone","Nothing matches that.")); return; }
+    shown.forEach(v => list.appendChild(row(v, on.includes(v), false,
+      checked => apply(checked ? on.concat([v]) : on.filter(x => x !== v)))));
+  }
+  function build(list0){
+    const keep = unset ? null : sel.slice();
+    opts = (list0 || []).slice();
+    if(keep){ sel = keep.filter(v => opts.includes(v));
+              if(!sel.length || sel.length === opts.length){ unset = true; sel = []; } }
+    filter = ""; search.value = "";
+    paint(); paintList();
+  }
+  search.oninput = () => { filter = search.value.trim().toLowerCase(); paintList(); };
+  search.onclick = e => e.stopPropagation();
+  clear.onclick = e => { e.stopPropagation(); unset = true; sel = [];
+                         paint(); paintList(); fire(); };
+  panel.onclick = e => e.stopPropagation();
+  btn.onclick = e => { e.preventDefault(); e.stopPropagation();
+    const open = wrap.classList.contains("open");
+    closePicks(wrap);
+    wrap.classList.toggle("open", !open);
+    if(!open){ filter = ""; search.value = ""; paintList(); } };
+
   wrap.vals = () => sel.slice();
+  wrap.isAll = () => unset;
   wrap.set = build;
   Object.defineProperty(wrap, "value", {get: () => sel.length === 1 ? sel[0] : ""});
   Object.defineProperty(wrap, "onchange", {get: () => handler, set: fn => { handler = fn; }});
@@ -844,13 +918,14 @@ function multiPick(allLabel, options){
 }
 /* a readable name for whatever is selected, used in titles and notes */
 function pickLabel(pick, allText){
+  if(pick.isAll()) return allText;
   const a = pick.vals();
-  if(!a.length) return allText;
+  if(!a.length) return "nothing selected";
   if(a.length <= 2) return a.join(" + ");
   return a.length+" "+allText.replace(/^All\s+/,"");
 }
 /* an empty selection means no restriction */
-const inSel = (pick, v) => { const a = pick.vals(); return !a.length || a.includes(v); };
+const inSel = (pick, v) => pick.isAll() || pick.vals().includes(v);
 const selDivs = pick => S.divisions.filter(d => inSel(pick, d));
 
 function divSelect(){ return multiPick("All divisions", S.divisions); }
@@ -1544,7 +1619,7 @@ RENDER.flsummary = function(){
 
   const draw = () => {
     const scope = M.feeders.filter(f => inSel(dS,f.div) && inSel(sS,f.sdn) && inSel(cS,f.cat));
-    const cats = cS.vals().length ? cS.vals() : CATS;
+    const cats = cS.isAll() ? CATS : cS.vals();
     const cols = [{w:W.cat,type:"text",align:"left"},{w:W.cnt,type:"int",align:"center"}]
       .concat([0,0,0,0,0,0].map(() => ({w:W.cnt,type:"int",align:"center"})));
     const head = [
@@ -1693,7 +1768,7 @@ function rankedTab(id, opts){
     if(opts.highOnly) base = base.filter(isHigh);
     if(mode !== "all") base = base.filter(f => f[key] < 0);
     const sortKey = mode === "all" ? "pctDec" : key;
-    const groups = cS.vals().length ? cS.vals() : cats;
+    const groups = cS.isAll() ? cats : cS.vals();
     host.innerHTML = "";
     if(opts.summary){
       const flagged = M.feeders.filter(f => inSel(dS, f.div) && isHigh(f));
